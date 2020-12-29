@@ -1,12 +1,18 @@
+#!/usr/bin/env python
+
 import argparse
 import json
+import os
 import subprocess as sub
+from copy import deepcopy
 from itertools import product
 from pathlib import Path
-import numpy as np
-from copy import deepcopy
 
 from prompt_toolkit.shortcuts import confirm
+
+import numpy as np
+
+DEBUG = os.getenv("DEBUG", None) is not None
 
 
 def instantiate(parameters):
@@ -34,8 +40,8 @@ def instantiate(parameters):
         yield parameters
 
 
-def launcher(cmd, debug=False):
-    if debug:
+def launcher(cmd):
+    if DEBUG:
         print(cmd)
         return
 
@@ -47,8 +53,12 @@ def launcher(cmd, debug=False):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(prog="neusweep")
-    parser.add_argument("entry")
-    parser.add_argument("args", nargs=argparse.REMAINDER)
+    parser.add_argument("entry", help="Python script to sweep")
+    parser.add_argument(
+        "args",
+        nargs=argparse.REMAINDER,
+        help="Arguments to be passed to the script being swept",
+    )
     args = parser.parse_args()
 
     params_file = "params.json"
@@ -80,4 +90,4 @@ if __name__ == "__main__":
         pass
 
     for configuration in configurations:
-        launcher(configuration, debug=True)
+        launcher(cmd + configuration)

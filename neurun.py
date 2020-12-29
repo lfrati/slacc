@@ -1,39 +1,44 @@
+#!/usr/bin/env python
+
 import argparse
 import json
 import os
-import random
+from uuid import uuid4
+from datetime import date
 import subprocess as sub
 from pathlib import Path
 
 from prompt_toolkit.shortcuts import confirm, prompt
 
+DEBUG = os.getenv("DEBUG", None) is not None
 
-def slurm_launcher(cmd, debug=False):
+
+def slurm_launcher(cmd, name, delete=False):
     """
     one day I'll figure out how to use srun directly, for now create a temp
     file with the slurm sbatch syntax, launch it and then delete it
     """
-    if debug:
+    if DEBUG:
         print(cmd)
         return
 
-    tmp_name = f"{random.getrandbits(32)}.script"
-    with open(tmp_name, "w") as f:
+    with open(name, "w") as f:
         f.write(cmd)
 
     # redirect unwanted output to null
     with open(os.devnull, "w") as FNULL:
         try:
-            sub.call(["sbatch", f"{tmp_name}"], shell=False, stdout=FNULL)
+            sub.call(["sbatch", f"{name}"], shell=False, stdout=FNULL)
         except sub.CalledProcessError as e:
             print("ERROR", e)
 
-    # delete the temporary file we passed to sbatch
-    sub.call(["rm", f"{tmp_name}"], shell=False)
+    if delete:
+        # delete the temporary file we passed to sbatch
+        sub.call(["rm", f"{name}"], shell=False)
 
 
-def local_launcher(cmd, debug=False):
-    if debug:
+def local_launcher(cmd):
+    if DEBUG:
         print(cmd)
         return
 
@@ -103,11 +108,14 @@ if __name__ == "__main__":
     if args.support == "local":
         commands = [cmd for _ in range(args.runs)]
         for command in commands:
-            local_launcher(cmd, debug=True)
+            local_launcher(cmd)
 
     elif args.support == "slurm":
         scripts = [slurm_script(config, cmd) for _ in range(args.runs)]
-        for script in scripts:
-            slurm_launcher(script, debug=True)
+        day = date.today().strftime("%Y%m%d")
+        exp = f"exp{uuid4().hex[:8]}"
+        for i, script in enumerate(scripts):
+            name = f"{exp}-{day}-{i}.sbatch"
+            slurm_launcher(script, name)
     else:
         raise NotImplementedError

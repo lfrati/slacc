@@ -53,21 +53,21 @@ def launcher(cmd):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(prog="neusweep")
-    parser.add_argument("entry", help="Python script to sweep")
     parser.add_argument(
-        "args",
+        "script",
         nargs=argparse.REMAINDER,
-        help="Arguments to be passed to the script being swept",
+        help="script to sweep over",
     )
     args = parser.parse_args()
 
     params_file = "params.json"
 
-    print("Entry:", args.entry)
-    print("Args:", args.args)
+    print("Script:", args.script)
+    entrypoint = args.script[0]
+    print("Entry:", entrypoint)
 
     ################# VALIDATE INPUT #################
-    assert Path(args.entry).exists(), f"File {args.entry} not found."
+    assert Path(entrypoint).exists(), f"File {entrypoint} not found."
     assert Path(params_file).exists(), f"Configuration file ({params_file}) not found."
     with open(params_file, "r") as f:
         params = json.loads(f.read())
@@ -75,7 +75,7 @@ if __name__ == "__main__":
 
     print("Params:\n", json.dumps(params, indent=2, sort_keys=True))
 
-    cmd = f"python {args.entry} {' '.join(args.args)}"
+    cmd = f"python {' '.join(args.script)} "  # space needed to properly parse following flags
     print(cmd)
 
     configurations = [

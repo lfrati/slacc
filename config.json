@@ -1,0 +1,27 @@
+{
+  "local": {
+    "cpu": { "env": "conda activate deep", "resources": "" },
+    "gpu": { "env": "conda activate deep", "resources": "" }
+  },
+  "slurm": {
+    "gpu": {
+      "env": "source activate deep",
+      "resources": {
+        "time": "2-00:00:00",
+        "account": "evolvingai",
+        "partition": "teton-gpu",
+        "gres": "gpu:p100:1",
+        "mem": "8000"
+      }
+    },
+    "cpu": {
+      "env": "source activate deep",
+      "resources": {
+        "time": "4-00:00:00",
+        "account": "evolvingai",
+        "partition": "teton",
+        "mem": "16000"
+      }
+    }
+  }
+}

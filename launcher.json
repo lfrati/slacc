@@ -1,0 +1,52 @@
+{
+  "local-cpu": {
+    "device": "cpu",
+    "host":"local",
+    "env": "conda activate deep",
+    "resources": ""
+  },
+  "local-gpu": {
+    "device": "gpu",
+    "host":"local",
+    "env": "conda activate deep",
+    "resources": ""
+  },
+  "dgx-gpu": {
+    "env": "source activate deep2",
+    "device": "gpu",
+    "host": "teton",
+    "resources": {
+      "time": "2-00:00:00",
+      "account": "evolvingai",
+      "partition": "dgx",
+      "cpus-per-task":1,
+      "gres": "gpu:v100:1",
+      "mem": "8000"
+    }
+  },
+  "moran-gpu": {
+    "env": "source activate deep",
+    "device": "gpu",
+    "host": "teton",
+    "resources": {
+      "time": "2-00:00:00",
+      "account": "evolvingai",
+      "partition": "moran",
+      "gres": "gpu:k20:1",
+      "cpus-per-task":1,
+      "mem": "8000"
+    }
+  },
+  "moran-cpu": {
+    "env": "source activate deep",
+    "device": "cpu",
+    "host": "teton",
+    "resources": {
+      "time": "4-00:00:00",
+      "account": "evolvingai",
+      "partition": "moran",
+      "cpus-per-task":1,
+      "mem": "16000"
+    }
+  }
+}

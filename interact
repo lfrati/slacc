@@ -1,0 +1,10 @@
+#!/bin/bash
+if [[ $# -ne 2 ]]; then
+        echo "Usage: interact partition gres"
+        echo -e "\t partition : parition name, used in --parttion=" 
+        echo -e "\t gres : gpu resources to request, e.g. --gres=gpu:1" 
+else 
+	PARTITION=$1
+	GRES=$2
+	srun --partition=$1 --gres=$2 --accel-bind=g --pty bash
+fi

@@ -1,4 +1,12 @@
 #!/usr/bin/env python
+"""
+Utility to launch a python script either locally or remotely (SLURM), on CPU or GPU.
+Uses configuration information from launcher.conf and supports launching multiple repeats.
+Flags can be passed to the script name by appending them at the end as follows
+> neurun RESOURCE {--runs} SCRIPT FLAGS
+e.g.
+> neurun.py moran-gpu --runs=2 dummy_gpujob.py --steps=10
+"""
 
 import argparse
 import json
@@ -8,19 +16,20 @@ from datetime import date
 import subprocess as sub
 from pathlib import Path
 
-from prompt_toolkit.shortcuts import confirm, prompt
-
 DEBUG = os.getenv("DEBUG", None) is not None
 
 
-def slurm_launcher(cmd, name, delete=False):
+def slurm_launcher(cmd, delete=False):
     """
-    one day I'll figure out how to use srun directly, for now create a temp
-    file with the slurm sbatch syntax, launch it and then delete it
+    Create a temp file with the slurm sbatch syntax, launch it and then delete it
     """
     if DEBUG:
         print(cmd)
         return
+
+    day = date.today().strftime("%Y%m%d")
+    exp = uuid4().hex[:8]
+    name = f"{day}-{exp}.sbatch"
 
     with open(name, "w") as f:
         f.write(cmd)
@@ -47,7 +56,7 @@ def local_launcher(cmd):
     process.wait()
 
 
-def slurm_script(conf, cmd):
+def make_slurm_script(conf, cmd):
     """
     Generate the information to be passed to SLURM about the job
     Also take care of setting up the environment
@@ -63,24 +72,24 @@ def slurm_script(conf, cmd):
 
 if __name__ == "__main__":
 
+    if DEBUG:
+        print(
+            "#####################\n" + "##### DEBUG MODE ####\n"
+            "#####################\n"
+        )
+
     parser = argparse.ArgumentParser(prog="neurun")
-    parser.add_argument("support")
-    parser.add_argument("device")
+    parser.add_argument("resource")
     parser.add_argument(
-        "--runs",
-        type=int,
-        help="How many repetitions to run.",
-        default=5,
+        "--runs", type=int, help="How many repetitions to run.", default=1,
     )
     parser.add_argument("entry")
     parser.add_argument("flags", nargs=argparse.REMAINDER)
     args = parser.parse_args()
 
-    config_file = "config.json"
-
+    config_file = "launcher.json"
+    print(args)
     print("File:", args.entry)
-    print("Support:", args.support)
-    print("Device:", args.device)
     print("Flags:", args.flags)
 
     ################# VALIDATE INPUT #################
@@ -89,33 +98,29 @@ if __name__ == "__main__":
     with open(config_file, "r") as f:
         available_configs = json.loads(f.read())
     assert (
-        args.support in available_configs.keys()
-    ), f"Requested configuration ({args.support}) not found in config file ({config_file})"
-    assert args.device in [
+        args.resource in available_configs.keys()
+    ), f"Requested configuration ({args.resource}) not found in config file ({config_file})"
+
+    config = available_configs[args.resource]
+    device = config["device"]
+    local = config["host"] == "local"
+    assert device in [
         "cpu",
         "gpu",
-    ], f"Wrong device requested: {args.device} not in [cpu, gpu]"
-    assert (
-        args.device in available_configs[args.support].keys()
-    ), f"Requested device ({args.device}) not found in {config_file}"
-    config = available_configs[args.support][args.device]
+    ], f"Wrong device requested: {device} not in [cpu, gpu]"
     ##################################################
 
     print("Config:\n", json.dumps(config, indent=2, sort_keys=True))
 
     cmd = f"python {args.entry} {' '.join(args.flags)}"
 
-    if args.support == "local":
+    if local:
         commands = [cmd for _ in range(args.runs)]
         for command in commands:
             local_launcher(cmd)
+    else:  # slurm
+        scripts = [make_slurm_script(config, cmd) for _ in range(args.runs)]
 
-    elif args.support == "slurm":
-        scripts = [slurm_script(config, cmd) for _ in range(args.runs)]
-        day = date.today().strftime("%Y%m%d")
-        exp = f"exp{uuid4().hex[:8]}"
         for i, script in enumerate(scripts):
-            name = f"{exp}-{day}-{i}.sbatch"
-            slurm_launcher(script, name)
-    else:
-        raise NotImplementedError
+            slurm_launcher(script)
+

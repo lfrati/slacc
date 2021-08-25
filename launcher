@@ -11,6 +11,7 @@ e.g.
 import argparse
 import json
 import os
+from tqdm import tqdm
 from uuid import uuid4
 from datetime import date
 import subprocess as sub
@@ -116,8 +117,10 @@ if __name__ == "__main__":
 
     if local:
         commands = [cmd for _ in range(args.runs)]
-        for command in commands:
+        for command in tqdm(commands):
+            print()
             local_launcher(cmd)
+            print()
     else:  # slurm
         scripts = [make_slurm_script(config, cmd) for _ in range(args.runs)]
 

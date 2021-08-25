@@ -12,7 +12,7 @@
     "resources": ""
   },
   "dgx-gpu": {
-    "env": "source activate deep",
+    "env": "conda activate deep",
     "device": "gpu",
     "host": "teton",
     "resources": {
@@ -24,8 +24,21 @@
       "mem": "8000"
     }
   },
+  "moran-gpu": {
+    "env": "",
+    "device": "gpu",
+    "host": "teton",
+    "resources": {
+      "time": "2-00:00:00",
+      "account": "evolvingai",
+      "partition": "moran",
+      "gres": "gpu:k20:1",
+      "cpus-per-task": 1,
+      "mem": "8000"
+    }
+  },
   "moran-cpu": {
-    "env": "source activate deep",
+    "env": "conda activate deep",
     "device": "cpu",
     "host": "teton",
     "resources": {
@@ -37,7 +50,7 @@
     }
   },
   "dggpu": {
-    "env": "source activate deep",
+    "env": "conda activate deep",
     "device": "gpu",
     "host": "vacc",
     "resources": {
@@ -49,7 +62,7 @@
     }
   },
   "blue": {
-    "env": "source activate deep",
+    "env": "conda activate deep",
     "device": "cpu",
     "host": "vacc",
     "resources": {

@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 """
-Utility to launch a python script either locally or remotely (SLURM), on CPU or GPU.
-Uses configuration information from launcher.conf and supports launching multiple repeats.
+Utility to launch a python script either locally or on SLURM, on CPU or GPU.
+Uses configuration information from config.json and supports launching multiple repeats.
 Flags can be passed to the script name by appending them at the end as follows
-> neurun RESOURCE {--runs} SCRIPT FLAGS
+> launcher RESOURCE {--runs} SCRIPT FLAGS
 e.g.
-> neurun.py moran-gpu --runs=2 dummy_gpujob.py --steps=10
+> launcher moran-gpu --runs=2 dummy_gpujob.py --steps=10
 """
 
 import argparse
@@ -48,6 +48,9 @@ def slurm_launcher(cmd, delete=False):
 
 
 def local_launcher(cmd):
+    """
+    Launches a command in a subprocess and waits for it.
+    """
     if DEBUG:
         print(cmd)
         return
@@ -88,7 +91,7 @@ if __name__ == "__main__":
     parser.add_argument("flags", nargs=argparse.REMAINDER)
     args = parser.parse_args()
 
-    config_file = "launcher.json"
+    config_file = "config.json"
     print(args)
     print("File:", args.entry)
     print("Flags:", args.flags)

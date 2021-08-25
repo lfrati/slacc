@@ -8,7 +8,7 @@ def make_flags(conf):
     return flags
 
 
-config_file = "launcher.json"
+config_file = "config.json"
 
 
 def read_conf(resource):

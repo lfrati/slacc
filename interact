@@ -1,10 +1,15 @@
 #!/bin/bash
-if [[ $# -ne 2 ]]; then
-        echo "Usage: interact partition gres"
-        echo -e "\t partition : parition name, used in --parttion=" 
-        echo -e "\t gres : gpu resources to request, e.g. --gres=gpu:1" 
+if [[ $# -ne 1 ]]; then
+        # echo "Usage: interact partition gres"
+        # echo -e "\t partition : parition name, used in --parttion=" 
+        # echo -e "\t gres : gpu resources to request, e.g. --gres=gpu:1" 
+        echo "Usage: interact configuration"
 else 
-	PARTITION=$1
-	GRES=$2
-	srun --partition=$1 --gres=$2 --accel-bind=g --pty bash
+	# PARTITION=$1
+	# GRES=$2
+	# srun --partition=$1 --gres=$2 --accel-bind=g --pty bash
+  echo "Using configuration: $1"
+  CMD=$(python interact.py "$1")
+  echo "Running: $CMD"
+  $CMD
 fi

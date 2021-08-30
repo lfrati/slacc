@@ -3,9 +3,10 @@ import json
 import time
 from http.client import HTTPConnection
 from pathlib import Path
+from utils import status
 
 
-def post_req(obj, args):
+def POST_req(obj):
     c = HTTPConnection(args.addr, args.port)
     c.connect()
     encoded = json.dumps(obj).encode("utf-8")
@@ -20,7 +21,7 @@ def post_req(obj, args):
     return json.loads(response_string)
 
 
-def get_req(path, args):
+def GET_req(path):
     c = HTTPConnection(args.addr, args.port)
     c.connect()
     c.request(
@@ -32,48 +33,13 @@ def get_req(path, args):
     return json.loads(response_string)
 
 
-def rpad(s, N):
-    spaces = " " * (N - len(s))
-    return s + spaces
-
-
-def lpad(s, N):
-    spaces = " " * (N - len(s))
-    return spaces + s
-
-
-def status(msg):
-    jobs = msg["result"]
-    header = (
-        f"{rpad('ID',6)} │ {rpad('CMD',20)} │ {rpad('TIME',20)} │ {rpad('STATE',10)}"
-    )
-    print()
-    print(header)
-    print("─" * 7 + "┼" + "─" * 22 + "┼" + "─" * 22 + "┼" + "─" * 11)
-    for job in jobs:
-        ID = job["id"]
-        cmd = job["cmd"]
-        cmd = (cmd[: 16 - 2] + "..") if len(cmd) > 16 else cmd
-        state = job["state"]
-        if state == "CANCELLED":
-            time = "-"
-        elif state == "QUEUED":
-            time = job["creation"]
-        else:
-            time = job["elapsed"]
-        print(f"{ID:<6} │ {cmd:<20} │ {time:<20} │ {state:<10}")
-    print()
-
-
-def make_req(action, body):
-    return {"action": action, "body": body, "path": path}
-
-
 if __name__ == "__main__":
+    global args
+
     parser = argparse.ArgumentParser(description="Interact with job scheduling.")
     parser.add_argument("--addr", default="localhost")
     parser.add_argument("--port", default=12345)
-    parser.add_argument("--action", type=str)
+    parser.add_argument("--action", required=True)
     parser.add_argument("--body", default="")
     args = parser.parse_args()
 
@@ -82,58 +48,57 @@ if __name__ == "__main__":
     if args.action == "test":
 
         print("Testing errors")
-        print(post_req({"body": "This is  a test"}, args))
-        print(post_req({"action": "error", "body": "sleep 4"}, args))
+        print(POST_req({"body": "This is  a test"}))
+        print(POST_req({"action": "error", "body": "sleep 4"}))
 
         print("Sending jobs")
-        msg = post_req(
-            {"action": "add", "body": "ping -c 3 www.google.com", "path": path}, args
+        msg = POST_req(
+            {"action": "add", "body": "ping -c 3 www.google.com", "path": path}
         )
         print(msg)
-        msg = post_req(
-            {"action": "add", "body": "ping -c 4 www.google.com", "path": path}, args
+        msg = POST_req(
+            {"action": "add", "body": "ping -c 4 www.google.com", "path": path}
         )
         print(msg)
-        msg = post_req(
-            {"action": "add", "body": "ping -c 2 www.google.com", "path": path}, args
+        msg = POST_req(
+            {"action": "add", "body": "ping -c 2 www.google.com", "path": path}
         )
         print(msg)
         to_kill = msg["result"]["id"]
-        msg = post_req(
-            {"action": "add", "body": "ping -c 7 www.google.com", "path": path}, args
+        msg = POST_req(
+            {"action": "add", "body": "ping -c 7 www.google.com", "path": path}
         )
         print(msg)
         time.sleep(0.5)
 
         print("Checking status of jobs")
-        msg = get_req("", args)
-        status(msg)
+        msg = GET_req("")
+        jobs = msg["result"]
+        status(jobs)
 
         print(f"Cancelling scheduled job {to_kill}")
-        print(post_req({"action": "cancel", "body": to_kill, "path": path}, args))
+        print(POST_req({"action": "cancel", "body": to_kill, "path": path}))
 
         print("Checking status of jobs")
-        msg = get_req("", args)
-        status(msg)
-
-        # msg = get_req("", args)
-        # status(msg)
-        # print(post_req({"action": "cancel_all", "body": ""}, args))
+        msg = GET_req("")
+        jobs = msg["result"]
+        status(jobs)
 
         print("Killing current job")
-        print(post_req({"action": "kill", "body": "", "path": ""}, args))
+        print(POST_req({"action": "kill", "body": "", "path": ""}))
 
         print("Checking status of jobs")
-        msg = get_req("", args)
-        status(msg)
+        msg = GET_req("")
+        jobs = msg["result"]
+        status(jobs)
 
     if args.action == "add":
         assert args.body != ""
-        msg = post_req({"action": args.action, "body": args.body, "path": path}, args)
+        msg = POST_req({"action": args.action, "body": args.body, "path": path})
         print(msg["result"])
 
     if args.action == "list":
-        msg = get_req("", args)
+        msg = GET_req("")
         if len(msg["result"]) > 0:
             status(msg)
         else:

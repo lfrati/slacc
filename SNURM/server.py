@@ -1,4 +1,5 @@
 import json
+import argparse
 import subprocess as sub
 from datetime import datetime, timedelta
 from enum import Enum
@@ -8,18 +9,20 @@ from threading import Thread, Lock
 from time import time
 import os
 
-queue = Queue()
-running = None
-proc = None
-q_lock = Lock()
-counter_file = "counter.txt"
-log_file = "history.log"
-
 DEBUG = os.getenv("DEBUG", None) is not None
 
 
+class Server:
+    def __init__(self):
+        self.queue = Queue()
+        self.running = None
+        self.proc = None
+        self.q_lock = Lock()
+
+
 def get_id():
-    with open("counter.txt", "r+") as f:
+
+    with open(args.counter, "r+") as f:
         val = int(f.read())
         val += 1
         f.seek(0)
@@ -46,18 +49,16 @@ class Job:
         self.log_path = os.path.join(self.path, f"job-{self.id}.out")
 
     def run(self):
-        global proc
-        global q_lock
 
         with open(self.log_path, "a") as log:
             self.start = time()
             self.state = State.RUNNING
             if DEBUG:
                 print("Launching", self)
-            proc = sub.Popen(
+            server.proc = sub.Popen(
                 f"cd {self.path}\n" + self.cmd, stdout=log, stderr=log, shell=True
             )
-            proc.wait()
+            server.proc.wait()
             self.end = time()
 
             if self.state == State.KILLED:
@@ -73,7 +74,7 @@ class Job:
 
     def record(self):
         print("Logging ", self.info())
-        with open("history.log", "a") as h:
+        with open(args.log, "a") as h:
             h.write(json.dumps(self.info()) + "\n")
 
     def info(self):
@@ -103,31 +104,29 @@ class Job:
 
 class MainLoop(Thread):
     def run(self):
-        global queue
-        global running
+
         while True:
-            job = queue.get()
+            job = server.queue.get()
             # DANGER ZONE job is not queued nor running
-            q_lock.acquire()
-            queue.task_done()
+            server.q_lock.acquire()
+            server.queue.task_done()
             if job.state != State.CANCELLED:
-                running = job
-                q_lock.release()
+                server.running = job
+                server.q_lock.release()
 
                 job.run()
 
-                q_lock.acquire()
-                running = None
-                q_lock.release()
+                server.q_lock.acquire()
+                server.running = None
+                server.q_lock.release()
             else:
-                q_lock.release()
+                server.q_lock.release()
                 if DEBUG:
                     print(f"Discarding job {job.id} '{job}'")
 
 
 class MyRequestHandler(BaseHTTPRequestHandler):
     def do_POST(self):
-        global q_lock
         if self.headers["Content-type"] == "application/json":
             content_len = int(self.headers["Content-length"])
             msg_bytes = self.rfile.read(content_len)
@@ -144,7 +143,7 @@ class MyRequestHandler(BaseHTTPRequestHandler):
 
             if action == "add":
                 job = Job(body, path)
-                queue.put(job)
+                server.queue.put(job)
                 if DEBUG:
                     print("Added", str(job), "to queue.")
                     print(self.status())
@@ -158,13 +157,13 @@ class MyRequestHandler(BaseHTTPRequestHandler):
                 else:
                     if DEBUG:
                         print(f"Canceling {to_cancel}")
-                    q_lock.acquire()
+                    server.q_lock.acquire()
                     cancelled = None
-                    for job in queue.queue:
+                    for job in server.queue.queue:
                         if job.id == to_cancel:
                             cancelled = job
                             job.state = State.CANCELLED
-                    q_lock.release()
+                    server.q_lock.release()
                     if cancelled is not None:
                         if DEBUG:
                             print(self.status())
@@ -176,28 +175,26 @@ class MyRequestHandler(BaseHTTPRequestHandler):
                         reply = {"result": "", "error": "Job not found."}
             elif action == "cancel_all":
                 count = 0
-                q_lock.acquire()
-                for job in queue.queue:
+                server.q_lock.acquire()
+                for job in server.queue.queue:
                     if job.state != State.CANCELLED:
                         job.state = State.CANCELLED
                         count += 1
-                q_lock.release()
+                server.q_lock.release()
                 if count == 0:
                     reply = {"result": f"No jobs to cancel.", "error": ""}
                 else:
                     reply = {"result": f"Cancelled {count} jobs", "error": ""}
             elif action == "kill":
-                global running
-                global proc
-                if running is not None and proc is not None:
-                    proc.kill()
-                    running.state = State.KILLED
+                if server.running is not None and server.proc is not None:
+                    server.proc.kill()
+                    server.running.state = State.KILLED
                     reply = {
-                        "result": f"Killed {running}",
+                        "result": f"Killed {server.running}",
                         "error": "",
                     }
-                    running = None
-                    proc = None
+                    server.running = None
+                    server.proc = None
                 else:
                     reply = {"result": f"Nothing to kill.", "error": ""}
 
@@ -209,18 +206,18 @@ class MyRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         # Ignoring self.path
         jobs = []
-        if running is not None:
-            jobs.append(running.info())
-        for job in queue.queue:
+        if server.running is not None:
+            jobs.append(server.running.info())
+        for job in server.queue.queue:
             jobs.append(job.info())
         reply = {"result": jobs, "error": ""}
         self.send(reply)
 
     def status(self):
-        if queue.qsize() == 0:
+        if server.queue.qsize() == 0:
             msg = "Queue: No jobs."
         else:
-            msg = "Queue:\n" + "\n".join([str(job) for job in queue.queue])
+            msg = "Queue:\n" + "\n".join([str(job) for job in server.queue.queue])
         return msg
 
     def send(self, msg):
@@ -235,13 +232,31 @@ class MyRequestHandler(BaseHTTPRequestHandler):
         self.wfile.write(msg_bytes)
 
 
-t = MainLoop()
-t.daemon = True
-t.start()
+if __name__ == "__main__":
+    global args
+    global server
 
-try:
-    server = HTTPServer(("", 12345), MyRequestHandler)
-    server.serve_forever()
-except KeyboardInterrupt:
-    print(" Shutting server down.")
-    server.socket.close()
+    parser = argparse.ArgumentParser(description="SNURM server")
+    parser.add_argument("--addr", default="localhost")
+    parser.add_argument("--port", default=12345)
+    parser.add_argument("--counter", default="counter.txt")
+    parser.add_argument("--log", default="history.log")
+    args = parser.parse_args()
+
+    server = Server()
+
+    if not os.path.exists(args.counter):
+        with open(args.counter, "w") as f:
+            f.write("0\n")
+
+    t = MainLoop()
+    t.daemon = True
+    t.start()
+
+    try:
+        print(f"Listening on {args.addr}:{args.port}")
+        s = HTTPServer((args.addr, args.port), MyRequestHandler)
+        s.serve_forever()
+    except KeyboardInterrupt:
+        print(" Shutting server down.")
+        s.socket.close()

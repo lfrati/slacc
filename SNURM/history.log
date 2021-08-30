@@ -1,0 +1,2 @@
+{"id": 151, "cmd": "ping -c 4 www.google.com", "elapsed": "0:00:03.021071", "creation": "2021/08/30-12:15:23", "state": "ENDED", "path": "/home/lapo/Playground/Server/test_folder/job-151.out"}
+{"id": 153, "cmd": "ping -c 7 www.google.com", "elapsed": "0:00:06.026818", "creation": "2021/08/30-12:15:23", "state": "ENDED", "path": "/home/lapo/Playground/Server/test_folder/job-153.out"}

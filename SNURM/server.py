@@ -1,33 +1,38 @@
-import json
 import argparse
+import json
+import os
 import subprocess as sub
 from datetime import datetime, timedelta
 from enum import Enum
 from http.server import BaseHTTPRequestHandler, HTTPServer, HTTPStatus
 from queue import Queue
-from threading import Thread, Lock
+from threading import Lock, Thread
 from time import time
-import os
 
 DEBUG = os.getenv("DEBUG", None) is not None
 
 
 class Server:
-    def __init__(self):
+    def __init__(self, counter, history):
         self.queue = Queue()
         self.running = None
         self.proc = None
         self.q_lock = Lock()
+        self.path = os.path.dirname(os.path.realpath(__file__))
+        self.counter_file = os.path.join(self.path, counter)
+        self.log_file = os.path.join(self.path, history)
 
+        if not os.path.exists(self.counter_file):
+            with open(self.counter_file, "w") as f:
+                f.write("0\n")
 
-def get_id():
-
-    with open(args.counter, "r+") as f:
-        val = int(f.read())
-        val += 1
-        f.seek(0)
-        f.write(str(val))
-        return val
+    def get_id(self):
+        with open(self.counter_file, "r+") as f:
+            val = int(f.read())
+            val += 1
+            f.seek(0)
+            f.write(str(val))
+            return val
 
 
 class State(Enum):
@@ -46,8 +51,8 @@ class Job:
         self.state = State.QUEUED
         self.launch_time = datetime.now()
         self.path = path
-        self.id = get_id()
-        self.log_path = os.path.join(self.path, f"job-{self.id}.out")
+        self.id = server.get_id()
+        self.out_file = os.path.join(self.path, f"job-{self.id}.out")
 
         self.script = f"cd {self.path}\n"
         if self.env != "":
@@ -60,7 +65,7 @@ class Job:
 
     def run(self):
 
-        with open(self.log_path, "a") as log:
+        with open(self.out_file, "a") as log:
             self.start = time()
             self.state = State.RUNNING
             if DEBUG:
@@ -86,7 +91,7 @@ class Job:
 
     def record(self):
         print("Logging ", self.info())
-        with open(args.log, "a") as h:
+        with open(server.log_file, "a") as h:
             h.write(str(self))
 
     def __repr__(self):
@@ -111,7 +116,7 @@ class Job:
             "creation": self.launch_time.strftime("%Y/%m/%d-%H:%M:%S"),
             "state": self.state.name,
             "env": self.env,
-            "path": self.log_path,
+            "path": self.out_file,
         }
 
 
@@ -263,7 +268,7 @@ if __name__ == "__main__":
     # TODO: "conda activate X" is messed up if the server is ran from a conda env.
     #       See https://github.com/conda/conda/issues/9296#issuecomment-537085104
     #       It has something to do with the env variables being inherited.
-    #       As a fix I make sure the server is launched in the base conda env. 
+    #       As a fix I make sure the server is launched in the base conda env.
     #       Obviously it will break at some point, good luck.
     p = sub.Popen("echo $CONDA_PREFIX", stdout=sub.PIPE, shell=True)
     conda = p.stdout.read().decode("utf-8")
@@ -276,11 +281,7 @@ if __name__ == "__main__":
     parser.add_argument("--log", default="history.log")
     args = parser.parse_args()
 
-    server = Server()
-
-    if not os.path.exists(args.counter):
-        with open(args.counter, "w") as f:
-            f.write("0\n")
+    server = Server(args.counter, args.log)
 
     t = MainLoop()
     t.daemon = True

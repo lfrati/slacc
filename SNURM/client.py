@@ -40,7 +40,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Interact with job scheduling.")
     parser.add_argument("--addr", default="localhost")
     parser.add_argument("--port", default=12345)
-    parser.add_argument("--action", required=True)
+    parser.add_argument("action")
     parser.add_argument("--cmd", default="")
     parser.add_argument("--id", default="")
     parser.add_argument("--env", default="")

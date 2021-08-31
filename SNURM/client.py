@@ -40,7 +40,8 @@ if __name__ == "__main__":
     parser.add_argument("--addr", default="localhost")
     parser.add_argument("--port", default=12345)
     parser.add_argument("--action", required=True)
-    parser.add_argument("--body", default="")
+    parser.add_argument("--cmd", default="")
+    parser.add_argument("--env", default="")
     args = parser.parse_args()
 
     path = Path().resolve().as_posix()
@@ -48,25 +49,45 @@ if __name__ == "__main__":
     if args.action == "test":
 
         print("Testing errors")
-        print(POST_req({"body": "This is  a test"}))
-        print(POST_req({"action": "error", "body": "sleep 4"}))
+        print(POST_req({"cmd": "This is  a test"}))
+        print(POST_req({"action": "error", "cmd": "sleep 4"}))
 
         print("Sending jobs")
         msg = POST_req(
-            {"action": "add", "body": "ping -c 3 www.google.com", "path": path}
+            {
+                "action": "add",
+                "cmd": "ping -c 3 www.google.com",
+                "path": path,
+                "env": "",
+            }
         )
         print(msg)
         msg = POST_req(
-            {"action": "add", "body": "ping -c 4 www.google.com", "path": path}
+            {
+                "action": "add",
+                "cmd": "ping -c 4 www.google.com",
+                "path": path,
+                "env": "",
+            }
         )
         print(msg)
         msg = POST_req(
-            {"action": "add", "body": "ping -c 2 www.google.com", "path": path}
+            {
+                "action": "add",
+                "cmd": "ping -c 2 www.google.com",
+                "path": path,
+                "env": "",
+            }
         )
         print(msg)
         to_kill = msg["result"]["id"]
         msg = POST_req(
-            {"action": "add", "body": "ping -c 7 www.google.com", "path": path}
+            {
+                "action": "add",
+                "cmd": "ping -c 7 www.google.com",
+                "path": path,
+                "env": "",
+            }
         )
         print(msg)
         time.sleep(0.5)
@@ -77,7 +98,7 @@ if __name__ == "__main__":
         status(jobs)
 
         print(f"Cancelling scheduled job {to_kill}")
-        print(POST_req({"action": "cancel", "body": to_kill, "path": path}))
+        print(POST_req({"action": "cancel", "id": to_kill, "path": path}))
 
         print("Checking status of jobs")
         msg = GET_req("")
@@ -85,7 +106,7 @@ if __name__ == "__main__":
         status(jobs)
 
         print("Killing current job")
-        print(POST_req({"action": "kill", "body": "", "path": ""}))
+        print(POST_req({"action": "kill", "path": ""}))
 
         print("Checking status of jobs")
         msg = GET_req("")
@@ -93,8 +114,10 @@ if __name__ == "__main__":
         status(jobs)
 
     if args.action == "add":
-        assert args.body != ""
-        msg = POST_req({"action": args.action, "body": args.body, "path": path})
+        assert args.cmd != ""
+        msg = POST_req(
+            {"action": args.action, "cmd": args.cmd, "path": path, "env": args.env}
+        )
         print(msg["result"])
 
     if args.action == "list":

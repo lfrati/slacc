@@ -39,14 +39,24 @@ class State(Enum):
 
 
 class Job:
-    def __init__(self, cmd, path):
+    def __init__(self, cmd, path, env):
         self.queued = time()
+        self.env = env  # like "conda activate deep"
         self.cmd = cmd  # no need to split if shell=True in Popen
         self.state = State.QUEUED
         self.launch_time = datetime.now()
         self.path = path
         self.id = get_id()
         self.log_path = os.path.join(self.path, f"job-{self.id}.out")
+
+        self.script = f"cd {self.path}\n"
+        if self.env != "":
+            # https://github.com/conda/conda/issues/9296#issuecomment-537085104
+            self.script = (
+                self.script
+                + f". $CONDA_PREFIX/etc/profile.d/conda.sh && conda activate {self.env}\n"
+            )
+        self.script = self.script + self.cmd
 
     def run(self):
 
@@ -55,9 +65,10 @@ class Job:
             self.state = State.RUNNING
             if DEBUG:
                 print("Launching", self)
-            server.proc = sub.Popen(
-                f"cd {self.path}\n" + self.cmd, stdout=log, stderr=log, shell=True
-            )
+
+            log.write(str(self))
+            log.flush()
+            server.proc = sub.Popen(self.script, stdout=log, stderr=log, shell=True)
             server.proc.wait()
             self.end = time()
 
@@ -68,6 +79,7 @@ class Job:
             else:
                 self.state = State.ENDED
                 self.record()
+                log.write("=== JOB ENDED ===")
                 if DEBUG:
                     print("Finished", self)
             log.flush()
@@ -75,7 +87,10 @@ class Job:
     def record(self):
         print("Logging ", self.info())
         with open(args.log, "a") as h:
-            h.write(json.dumps(self.info()) + "\n")
+            h.write(str(self))
+
+    def __repr__(self):
+        return json.dumps(self.info()) + "\n"
 
     def info(self):
 
@@ -95,11 +110,9 @@ class Job:
             "elapsed": elapsed,
             "creation": self.launch_time.strftime("%Y/%m/%d-%H:%M:%S"),
             "state": self.state.name,
+            "env": self.env,
             "path": self.log_path,
         }
-
-    def __repr__(self):
-        return f"Job {self.id} '{self.cmd}'"
 
 
 class MainLoop(Thread):
@@ -134,24 +147,35 @@ class MyRequestHandler(BaseHTTPRequestHandler):
             msg = json.loads(msg_str)
             try:
                 action = msg["action"]
-                body = msg["body"]
-                path = msg["path"]
             except KeyError as e:
                 reply = {"result": "", "error": f"Missing {e} field."}
                 self.send(reply)
                 return
 
             if action == "add":
-                job = Job(body, path)
-                server.queue.put(job)
-                if DEBUG:
-                    print("Added", str(job), "to queue.")
-                    print(self.status())
-                reply = {"result": job.info(), "error": ""}
+                try:
+                    cmd = msg["cmd"]
+                    path = msg["path"]
+                    env = msg["env"]
+                except KeyError as e:
+                    reply = {"result": "", "error": f"Missing {e} field."}
+                    self.send(reply)
+                    return
+                else:
+                    job = Job(cmd, path, env)
+                    server.queue.put(job)
+                    if DEBUG:
+                        print("Added", str(job), "to queue.")
+                        print(self.status())
+                    reply = {"result": job.info(), "error": ""}
 
             elif action == "cancel":
                 try:
-                    to_cancel = int(body)
+                    to_cancel = int(msg["id"])
+                except KeyError as e:
+                    reply = {"result": "", "error": f"Missing {e} field."}
+                    self.send(reply)
+                    return
                 except ValueError as e:
                     reply = {"result": "", "error": f"Wrong ID format. {e}"}
                 else:
@@ -235,6 +259,15 @@ class MyRequestHandler(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     global args
     global server
+
+    # TODO: "conda activate X" is messed up if the server is ran from a conda env.
+    #       See https://github.com/conda/conda/issues/9296#issuecomment-537085104
+    #       It has something to do with the env variables being inherited.
+    #       As a fix I make sure the server is launched in the base conda env. 
+    #       Obviously it will break at some point, good luck.
+    p = sub.Popen("echo $CONDA_PREFIX", stdout=sub.PIPE, shell=True)
+    conda = p.stdout.read().decode("utf-8")
+    assert "envs" not in conda, "Deactivate conda environment first."
 
     parser = argparse.ArgumentParser(description="SNURM server")
     parser.add_argument("--addr", default="localhost")

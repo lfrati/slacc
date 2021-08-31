@@ -197,35 +197,35 @@ class MyRequestHandler(BaseHTTPRequestHandler):
                         if DEBUG:
                             print(self.status())
                         reply = {
-                            "result": f"{cancelled.id}",
+                            "result": f"{cancelled.info()}",
                             "error": "",
                         }
                     else:
                         reply = {"result": "", "error": "Job not found."}
             elif action == "cancel_all":
                 count = 0
+                cancelled = []
                 server.q_lock.acquire()
                 for job in server.queue.queue:
                     if job.state != State.CANCELLED:
                         job.state = State.CANCELLED
+                        cancelled.append(job)
                         count += 1
                 server.q_lock.release()
-                if count == 0:
-                    reply = {"result": f"No jobs to cancel.", "error": ""}
-                else:
-                    reply = {"result": f"Cancelled {count} jobs", "error": ""}
+                reply = {"result": cancelled, "error": ""}
+
             elif action == "kill":
                 if server.running is not None and server.proc is not None:
                     server.proc.kill()
                     server.running.state = State.KILLED
                     reply = {
-                        "result": f"Killed {server.running}",
+                        "result": f"{server.running.info()}",
                         "error": "",
                     }
                     server.running = None
                     server.proc = None
                 else:
-                    reply = {"result": f"Nothing to kill.", "error": ""}
+                    reply = {"result": f"", "error": ""}
 
             else:
                 reply = {"result": "", "error": "Unrecognized action"}

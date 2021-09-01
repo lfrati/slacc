@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Utility to launch a python script either locally or on SLURM, on CPU or GPU.
+Utility to launch a python script on SLURM, using CPU or GPU.
 Uses configuration information from config.json and supports launching multiple repeats.
 Flags can be passed to the script name by appending them at the end as follows
 > launcher RESOURCE {--runs} SCRIPT FLAGS
@@ -47,19 +47,6 @@ def slurm_launcher(cmd, delete=False):
         sub.call(["rm", f"{name}"], shell=False)
 
 
-def local_launcher(cmd):
-    """
-    Launches a command in a subprocess and waits for it.
-    """
-    if DEBUG:
-        print(cmd)
-        return
-
-    parts = cmd.split(" ")
-    process = sub.Popen(parts)
-    process.wait()
-
-
 def make_slurm_script(conf, cmd):
     """
     Generate the information to be passed to SLURM about the job
@@ -85,7 +72,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog="neurun")
     parser.add_argument("resource")
     parser.add_argument(
-        "--runs", type=int, help="How many repetitions to run.", default=1,
+        "--runs",
+        type=int,
+        help="How many repetitions to run.",
+        default=1,
     )
     parser.add_argument("entry")
     parser.add_argument("flags", nargs=argparse.REMAINDER)
@@ -107,7 +97,6 @@ if __name__ == "__main__":
 
     config = available_configs[args.resource]
     device = config["device"]
-    local = config["host"] == "local"
     assert device in [
         "cpu",
         "gpu",
@@ -118,15 +107,7 @@ if __name__ == "__main__":
 
     cmd = f"python {args.entry} {' '.join(args.flags)}"
 
-    if local:
-        commands = [cmd for _ in range(args.runs)]
-        for command in tqdm(commands):
-            print()
-            local_launcher(cmd)
-            print()
-    else:  # slurm
-        scripts = [make_slurm_script(config, cmd) for _ in range(args.runs)]
+    scripts = [make_slurm_script(config, cmd) for _ in range(args.runs)]
 
-        for i, script in enumerate(scripts):
-            slurm_launcher(script)
-
+    for i, script in enumerate(scripts):
+        slurm_launcher(script)

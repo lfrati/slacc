@@ -25,31 +25,34 @@ def show_gpu_info():
     print(f"Current device: {curr_device} Has cuda? {has_cuda}")
 
 
-print("Flags: ", sys.argv[1:])
-try:
-    a = torch.ones(10)
-    a.normal_(0, 1)
-except:
-    print("ERROR: TORCH test failed!")
-else:
-    print("OK: TORCH test passed!")
+if __name__ == "__main__":
 
-try:
-    b = torch.ones(10).cuda()
-    b.normal_(0, 1)
-except:
-    print("ERROR: CUDA test failed!")
-else:
-    print("OK: CUDA test passed!")
+    print("Flags: ", sys.argv[1:])
 
-print("=" * 20, "INFO", "=" * 20)
-# number of cores
-p = psutil.Process()
-try:
-    print("Cores:", len(p.cpu_affinity()))
-except:
-    pass
-# memory report seems wrong.
-# print("Memory:", {key:get_size(val) for key,val in p.memory_info()._asdict().items()})
-print("Torch version:", torch.__version__)
-show_gpu_info()
+    try:
+        a = torch.ones(10)
+        a.normal_(0, 1)
+    except:
+        print("ERROR: TORCH test failed!")
+    else:
+        print("OK: TORCH test passed!")
+
+    try:
+        b = torch.ones(10).cuda()
+        b.normal_(0, 1)
+    except:
+        print("ERROR: CUDA test failed!")
+    else:
+        print("OK: CUDA test passed!")
+
+    print("=" * 20, "INFO", "=" * 20)
+    # number of cores
+    p = psutil.Process()
+    try:
+        print("Cores:", len(p.cpu_affinity()))
+    except:
+        pass
+    # memory report seems wrong.
+    # print("Memory:", {key:get_size(val) for key,val in p.memory_info()._asdict().items()})
+    print("Torch version:", torch.__version__)
+    show_gpu_info()

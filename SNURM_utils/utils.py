@@ -1,3 +1,7 @@
+import json
+from http.client import HTTPConnection
+
+
 def rpad(s, N):
     spaces = " " * (N - len(s))
     return s + spaces
@@ -28,3 +32,30 @@ def status(jobs):
             time = job["elapsed"]
         print(f"{ID:<6} │ {cmd:<20} │ {time:<20} │ {state:<10}")
     print()
+
+
+def POST_req(obj, addr, port):
+    c = HTTPConnection(addr, port)
+    c.connect()
+    encoded = json.dumps(obj).encode("utf-8")
+    c.request(
+        "POST",
+        "/",
+        body=encoded,
+        headers={"Content-type": "application/json", "Content-length": len(encoded)},
+    )
+    response_bytes = c.getresponse().read()
+    response_string = response_bytes.decode("utf-8")
+    return json.loads(response_string)
+
+
+def GET_req(path, addr, port):
+    c = HTTPConnection(addr, port)
+    c.connect()
+    c.request(
+        "GET",
+        path,
+    )
+    response_bytes = c.getresponse().read()
+    response_string = response_bytes.decode("utf-8")
+    return json.loads(response_string)

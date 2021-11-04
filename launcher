@@ -9,6 +9,7 @@ e.g.
 """
 
 import argparse
+import tempfile
 import json
 import os
 from tqdm import tqdm
@@ -20,7 +21,7 @@ from pathlib import Path
 DEBUG = os.getenv("DEBUG", None) is not None
 
 
-def slurm_launcher(cmd, delete=False):
+def slurm_launcher(cmd):
     """
     Create a temp file with the slurm sbatch syntax, launch it and then delete it
     """
@@ -28,23 +29,10 @@ def slurm_launcher(cmd, delete=False):
         print(cmd)
         return
 
-    day = date.today().strftime("%Y%m%d")
-    exp = uuid4().hex[:8]
-    name = f"{day}-{exp}.sbatch"
-
-    with open(name, "w") as f:
-        f.write(cmd)
-
-    # redirect unwanted output to null
-    with open(os.devnull, "w") as FNULL:
-        try:
-            sub.call(["sbatch", f"{name}"], shell=False, stdout=FNULL)
-        except sub.CalledProcessError as e:
-            print("ERROR", e)
-
-    if delete:
-        # delete the temporary file we passed to sbatch
-        sub.call(["rm", f"{name}"], shell=False)
+    with tempfile.NamedTemporaryFile() as f:
+        f.write(cmd.encode("utf-8"))
+        f.flush()
+        sub.call(["sbatch", f"{f.name}"], shell=False)
 
 
 def make_slurm_script(conf, cmd):
@@ -57,7 +45,10 @@ def make_slurm_script(conf, cmd):
     flags = "\n".join(
         f"#SBATCH --{flag}={value}" for flag, value in conf["resources"].items()
     )
-    script = f"{shebang}\n{flags}\n\n{conf['env']}\n{cmd}"
+    script = f"{shebang}\n{flags}\n\n"
+    script += "source ~/.bashrc\n"  # needed to conda activate and stuff
+    script += "cd ${SLURM_SUBMIT_DIR}\n"  # sbatch spawns you in the home
+    script += f"{conf['env']}\n{cmd}"  # activate conda env and launch script
     return script
 
 

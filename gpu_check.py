@@ -40,10 +40,12 @@ if __name__ == "__main__":
     try:
         b = torch.ones(10).cuda()
         b.normal_(0, 1)
-    except:
-        print("ERROR: CUDA test failed!")
+    except Exception as e:
+        print(f"ERROR: CUDA test failed!\n{e}")
+        cuda = False
     else:
         print("OK: CUDA test passed!")
+        cuda = True
 
     print("=" * 20, "INFO", "=" * 20)
     # number of cores
@@ -55,4 +57,5 @@ if __name__ == "__main__":
     # memory report seems wrong.
     # print("Memory:", {key:get_size(val) for key,val in p.memory_info()._asdict().items()})
     print("Torch version:", torch.__version__)
-    show_gpu_info()
+    if cuda:
+        show_gpu_info()

@@ -61,18 +61,6 @@
       "mem": "16G"
     }
   },
-  "bdgpu": {
-    "env": "conda activate deep",
-    "device": "gpu",
-    "host": "vacc",
-    "resources": {
-      "time": "1-00:00:00",
-      "partition": "bdgpu",
-      "gres": "gpu:1",
-      "cpus-per-task": 1,
-      "mem": "8000"
-    }
-  },
   "blue": {
     "env": "conda activate deep",
     "device": "cpu",

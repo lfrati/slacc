@@ -58,7 +58,7 @@
       "partition": "bdgpu",
       "gres": "gpu:1",
       "cpus-per-task": 1,
-      "mem": "16G"
+      "mem": "10G"
     }
   },
   "blue": {

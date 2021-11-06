@@ -12,11 +12,12 @@ import argparse
 import tempfile
 import json
 import os
-from tqdm import tqdm
-from uuid import uuid4
-from datetime import date
 import subprocess as sub
+from datetime import date
 from pathlib import Path
+from uuid import uuid4
+
+from tqdm import tqdm
 
 DEBUG = os.getenv("DEBUG", None) is not None
 
@@ -26,7 +27,9 @@ def slurm_launcher(cmd):
     Create a temp file with the slurm sbatch syntax, launch it and then delete it
     """
     if DEBUG:
+        print("\n#### OUTPUT SCRIPT ####")
         print(cmd)
+        print()
         return
 
     with tempfile.NamedTemporaryFile() as f:
@@ -35,20 +38,22 @@ def slurm_launcher(cmd):
         sub.call(["sbatch", f"{f.name}"], shell=False)
 
 
-def make_slurm_script(conf, cmd):
+def make_slurm_script(conf, cmd, rundir):
     """
     Generate the information to be passed to SLURM about the job
     Also take care of setting up the environment
     The python command will be added afterwards
     """
+    # The shebang is not needed by slurm, but can be useful if we want to try running the script
+    # ourselves.
     shebang = "#!/bin/bash"
     flags = "\n".join(
         f"#SBATCH --{flag}={value}" for flag, value in conf["resources"].items()
     )
     script = f"{shebang}\n{flags}\n\n"
-    script += "source ~/.bashrc\n"  # needed to conda activate and stuff
-    script += "cd ${SLURM_SUBMIT_DIR}\n"  # sbatch spawns you in the home
-    script += f"{conf['env']}\n{cmd}"  # activate conda env and launch script
+    script += "source ~/.bash_profile\n"  # build the user's environment just as if we spawned a new login shell
+    script += f"cd {rundir}\n"  # run in the same directory as the python script, so relative paths work
+    script += f"{conf['env']} && {cmd}"  # activate conda env and launch script if successful
     return script
 
 
@@ -72,14 +77,16 @@ if __name__ == "__main__":
     parser.add_argument("flags", nargs=argparse.REMAINDER)
     args = parser.parse_args()
 
-    config_file = "config.json"
+    # Find config file in the same folder as this launcher script.
+    config_file = Path(__file__).parent / "config.json"
     print(args)
     print("File:", args.entry)
     print("Flags:", args.flags)
 
     ################# VALIDATE INPUT #################
-    assert Path(args.entry).exists(), f"File {args.entry} not found."
-    assert Path(config_file).exists(), f"Configuration file ({config_file}) not found."
+    entry_path = Path(args.entry).resolve()
+    assert entry_path.exists(), f"File {args.entry} not found."
+    assert config_file.exists(), f"Configuration file ({config_file}) not found."
     with open(config_file, "r") as f:
         available_configs = json.loads(f.read())
     assert (
@@ -96,9 +103,9 @@ if __name__ == "__main__":
 
     print("Config:\n", json.dumps(config, indent=2, sort_keys=True))
 
-    cmd = f"python {args.entry} {' '.join(args.flags)}"
-
-    scripts = [make_slurm_script(config, cmd) for _ in range(args.runs)]
+    cmd = f"time python {entry_path} {' '.join(args.flags)}"
+    rundir = entry_path.parent
+    scripts = [make_slurm_script(config, cmd, rundir) for _ in range(args.runs)]
 
     for i, script in enumerate(scripts):
         slurm_launcher(script)

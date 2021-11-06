@@ -1,11 +1,30 @@
 # NEURO(botics) simple job MANAGER
 
-Isn't it fun to have a nice GPU in your computer and to experiment left and right? You just write some python scripts and then launch them on your machine, wait, repeat. Life is simple and beautiful.
+Isn't it fun to have a nice GPU in your computer and to experiment left and right? You just write some python scripts
+and then launch them on your machine, wait, repeat. Life is simple and beautiful.
+
 But then inevitably it happens. 
+
 You want to launch more scripts, longer scripts, test different parameters... 
 So you have to go beg the SLURM gods to assist you.
 Evil bash scripts start popping up everywhere, requesting resources, launching jobs....
 Wouldn't it be nice to just abstract that pain away and remain in python land?
+
+## Prerequisites
+
+- Python >=3.5 
+- PyTorch >=1.6.0
+- psutil
+- pynvml
+
+Most of these utilities are only needed if you want to run `gpu_check.py`.
+
+To set up a compatible conda environment:
+```shell
+$  conda create -n <env-name> -c conda-forge -c pytorch python=3.9 psutil pynvml pytorch cudatoolkit=10.2
+```
+You may want to check [here](https://pytorch.org/get-started/locally/) to confirm the pytorch installation procedure is
+correct for your GPU and NVIDIA driver.
 
 ## [launcher](launcher)
 Allows you to turn

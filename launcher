@@ -38,7 +38,7 @@ def slurm_launcher(cmd):
         sub.call(["sbatch", f"{f.name}"], shell=False)
 
 
-def make_slurm_script(conf, cmd, rundir):
+def make_slurm_script(conf, cmd):
     """
     Generate the information to be passed to SLURM about the job
     Also take care of setting up the environment
@@ -52,7 +52,7 @@ def make_slurm_script(conf, cmd, rundir):
     )
     script = f"{shebang}\n{flags}\n\n"
     script += "source ~/.bash_profile\n"  # build the user's environment just as if we spawned a new login shell
-    script += f"cd {rundir}\n"  # run in the same directory as the python script, so relative paths work
+    script += "cd ${SLURM_SUBMIT_DIR}\n"  # run in the same directory as the python script, so relative paths work
     script += f"{conf['env']} && {cmd}"  # activate conda env and launch script if successful
     return script
 
@@ -66,27 +66,51 @@ if __name__ == "__main__":
         )
 
     parser = argparse.ArgumentParser(prog="neurun")
-    parser.add_argument("resource")
+    parser.add_argument(
+        "resource",
+        help="Identifier of the resource configuration to use. Must be one of the configs present in config.json.",
+    )
     parser.add_argument(
         "--runs",
         type=int,
         help="How many repetitions to run.",
         default=1,
     )
-    parser.add_argument("entry")
-    parser.add_argument("flags", nargs=argparse.REMAINDER)
+    parser.add_argument(
+        "-d",
+        "--rundir",
+        help="The directory from which to launch the script. Slurm output will be directed here.",
+    )
+    parser.add_argument(
+        "-f",
+        "--force",
+        action="store_true",
+        help="Launch a new job even if another job has already used this output directory. Does not remove the"
+        " previous output log, and only needed when specifying --rundir.",
+    )
+    parser.add_argument("entry", help="The python script to launch.")
+    parser.add_argument("flags", nargs=argparse.REMAINDER, help="Flags to be passed to the python script.")
     args = parser.parse_args()
 
+    ################# VALIDATE INPUT #################
     # Find config file in the same folder as this launcher script.
     config_file = Path(__file__).parent / "config.json"
     print(args)
-    print("File:", args.entry)
-    print("Flags:", args.flags)
 
-    ################# VALIDATE INPUT #################
+    if args.rundir:
+        rundir = Path(args.rundir)
+        rundir.mkdir(exist_ok=True)
+        if not args.force and list(rundir.glob("slurm-*.out")):
+            parser.error(f"A Slurm output file already exists in the target directory: {rundir.resolve()}.\nUse"
+                         " -f/--force to run in this folder anyway.")
+    else:
+        rundir = Path(".")
+
     entry_path = Path(args.entry).resolve()
-    assert entry_path.exists(), f"File {args.entry} not found."
+    assert entry_path.exists(), f"File {entry_path} not found."
+    assert entry_path.is_file(), f"File {entry_path} is not a file."
     assert config_file.exists(), f"Configuration file ({config_file}) not found."
+    assert config_file.is_file(), f"Configuration file ({config_file}) is not a file."
     with open(config_file, "r") as f:
         available_configs = json.loads(f.read())
     assert (
@@ -101,11 +125,14 @@ if __name__ == "__main__":
     ], f"Wrong device requested: {device} not in [cpu, gpu]"
     ##################################################
 
+    os.chdir(rundir)
+    print("Running from:", rundir.resolve())
+    print("File:", entry_path)
+    print("Flags:", args.flags)
     print("Config:\n", json.dumps(config, indent=2, sort_keys=True))
 
     cmd = f"time python {entry_path} {' '.join(args.flags)}"
-    rundir = entry_path.parent
-    scripts = [make_slurm_script(config, cmd, rundir) for _ in range(args.runs)]
+    scripts = [make_slurm_script(config, cmd) for _ in range(args.runs)]
 
     for i, script in enumerate(scripts):
         slurm_launcher(script)

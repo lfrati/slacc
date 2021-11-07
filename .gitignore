@@ -2,3 +2,6 @@ __pycache__
 *.out
 history.log
 counter.txt
+
+# PyCharm / IntelliJ IDEA settings
+.idea/

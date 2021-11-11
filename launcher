@@ -1,11 +1,23 @@
 #!/usr/bin/env python
 """
-Utility to launch a python script on SLURM, using CPU or GPU.
-Uses configuration information from config.json and supports launching multiple repeats.
-Flags can be passed to the script name by appending them at the end as follows
-> launcher RESOURCE {--runs} SCRIPT FLAGS
+Utility to launch a python script on SLURM, using CPU or GPU. Uses configuration
+information from config.json and supports launching multiple repeats.
+
+Flags can be passed to the delegated script by appending them at the end as follows
+    > launcher RESOURCE {--runs} SCRIPT FLAGS
 e.g.
-> launcher moran-gpu --runs=2 dummy_gpujob.py --steps=10
+    > launcher moran-gpu --runs=2 dummy_gpujob.py --epochs=10 --seed 42
+is equivalent to twice running this:
+    > python dummy_gpujob.py --epochs=10 --seed 42
+
+Furthermore, any settings accepted by `sbatch` may be supplied on the command line.
+These will override the options provided by config.json, if given. For example, to
+add more memory to an existing config:
+    > launcher dggpu --mem=64G dummy_gpujob.py --epochs=10 --seed 42
+
+IMPORTANT: The sbatch options must be supplied in "--name=value" fashion, with an
+equals sign; "--name value" will NOT parse correctly. For any other options
+(including script flags) you may use either format.
 """
 
 import argparse
@@ -22,20 +34,31 @@ from tqdm import tqdm
 DEBUG = os.getenv("DEBUG", None) is not None
 
 
-def slurm_launcher(cmd):
+class HelpFormatter(argparse.RawDescriptionHelpFormatter, argparse.ArgumentDefaultsHelpFormatter):
+    """
+    This class adds no new functionality, only is used to combine the existing functionality of two different
+    formatters through multiple inheritance.
+    """
+    pass
+
+
+def slurm_launcher(cmd, sbatch_args):
     """
     Create a temp file with the slurm sbatch syntax, launch it and then delete it
     """
     if DEBUG:
         print("\n#### OUTPUT SCRIPT ####")
         print(cmd)
+        print("\n#### SBATCH CALL ####")
+        sbatch_cmd = ["sbatch"] + sbatch_args + ["<file>"]
+        print(" ".join(sbatch_cmd))
         print()
         return
 
     with tempfile.NamedTemporaryFile() as f:
         f.write(cmd.encode("utf-8"))
         f.flush()
-        sub.call(["sbatch", f"{f.name}"], shell=False)
+        sub.call(["sbatch"] + sbatch_args + [f"{f.name}"], shell=False)
 
 
 def make_slurm_script(conf, cmd):
@@ -65,7 +88,7 @@ if __name__ == "__main__":
             "#####################\n"
         )
 
-    parser = argparse.ArgumentParser(prog="neurun")
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=HelpFormatter)
     parser.add_argument(
         "resource",
         help="Identifier of the resource configuration to use. Must be one of the configs present in config.json.",
@@ -90,7 +113,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("entry", help="The python script to launch.")
     parser.add_argument("flags", nargs=argparse.REMAINDER, help="Flags to be passed to the python script.")
-    args = parser.parse_args()
+    args, sbatch_args = parser.parse_known_args()
 
     ################# VALIDATE INPUT #################
     # Find config file in the same folder as this launcher script.
@@ -99,7 +122,8 @@ if __name__ == "__main__":
 
     if args.rundir:
         rundir = Path(args.rundir)
-        rundir.mkdir(exist_ok=True)
+        if not DEBUG:
+            rundir.mkdir(exist_ok=True, parents=True)
         if not args.force and list(rundir.glob("slurm-*.out")):
             parser.error(f"A Slurm output file already exists in the target directory: {rundir.resolve()}.\nUse"
                          " -f/--force to run in this folder anyway.")
@@ -125,7 +149,8 @@ if __name__ == "__main__":
     ], f"Wrong device requested: {device} not in [cpu, gpu]"
     ##################################################
 
-    os.chdir(rundir)
+    if not DEBUG:
+        os.chdir(rundir)
     print("Running from:", rundir.resolve())
     print("File:", entry_path)
     print("Flags:", args.flags)
@@ -135,4 +160,4 @@ if __name__ == "__main__":
     scripts = [make_slurm_script(config, cmd) for _ in range(args.runs)]
 
     for i, script in enumerate(scripts):
-        slurm_launcher(script)
+        slurm_launcher(script, sbatch_args)

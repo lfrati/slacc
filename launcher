@@ -9,13 +9,10 @@ e.g.
 """
 
 import argparse
-import tempfile
 import json
 import os
-from tqdm import tqdm
-from uuid import uuid4
-from datetime import date
 import subprocess as sub
+import tempfile
 from pathlib import Path
 
 DEBUG = os.getenv("DEBUG", None) is not None

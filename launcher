@@ -69,14 +69,14 @@ if __name__ == "__main__":
     parser.add_argument("flags", nargs=argparse.REMAINDER)
     args = parser.parse_args()
 
-    config_file = "config.json"
+    config_file = Path(__file__).parent / "config.json"
     print(args)
     print("File:", args.entry)
     print("Flags:", args.flags)
 
     ################# VALIDATE INPUT #################
     assert Path(args.entry).exists(), f"File {args.entry} not found."
-    assert Path(config_file).exists(), f"Configuration file ({config_file}) not found."
+    assert config_file.exists(), f"Configuration file ({config_file}) not found."
     with open(config_file, "r") as f:
         available_configs = json.loads(f.read())
     assert (

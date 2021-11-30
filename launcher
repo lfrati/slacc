@@ -12,10 +12,20 @@ import argparse
 import json
 import os
 import subprocess as sub
+import sys
 import tempfile
 from pathlib import Path
+import re
 
 DEBUG = os.getenv("DEBUG", None) is not None
+
+
+def here():
+    # https://stackoverflow.com/a/19800587
+    try:
+        return Path(os.path.realpath(__file__)).parent
+    except NameError:
+        return sys.argv[0]
 
 
 def slurm_launcher(cmd):
@@ -65,17 +75,16 @@ if __name__ == "__main__":
         help="How many repetitions to run.",
         default=1,
     )
-    parser.add_argument("entry")
-    parser.add_argument("flags", nargs=argparse.REMAINDER)
+    parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
 
-    config_file = Path(__file__).parent / "config.json"
+    config_file = here() / "config.json"
     print(args)
-    print("File:", args.entry)
-    print("Flags:", args.flags)
+    print("Command:", args.command)
 
-    ################# VALIDATE INPUT #################
-    assert Path(args.entry).exists(), f"File {args.entry} not found."
+    pat = re.compile("")
+
+    ################ VALIDATE CONFIG ################
     assert config_file.exists(), f"Configuration file ({config_file}) not found."
     with open(config_file, "r") as f:
         available_configs = json.loads(f.read())
@@ -93,7 +102,7 @@ if __name__ == "__main__":
 
     print("Config:\n", json.dumps(config, indent=2, sort_keys=True))
 
-    cmd = f"python {args.entry} {' '.join(args.flags)}"
+    cmd = " ".join(args.command)
 
     scripts = [make_slurm_script(config, cmd) for _ in range(args.runs)]
 

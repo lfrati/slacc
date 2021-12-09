@@ -76,6 +76,7 @@ def make_slurm_script(conf, cmd):
     script = f"{shebang}\n{flags}\n\n"
     script += "source ~/.bash_profile\n"  # build the user's environment just as if we spawned a new login shell
     script += "cd ${SLURM_SUBMIT_DIR}\n"  # run in the same directory as the python script, so relative paths work
+    script += f"echo 'Command: {cmd}'\n"  # print the command we're about to run
     script += f"{conf['env']} && {cmd}"  # activate conda env and launch script if successful
     return script
 

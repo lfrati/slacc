@@ -21,15 +21,12 @@ equals sign; "--name value" will NOT parse correctly. For any other options
 """
 
 import argparse
+import shutil
 import tempfile
 import json
 import os
 import subprocess as sub
-from datetime import date
 from pathlib import Path
-from uuid import uuid4
-
-from tqdm import tqdm
 
 DEBUG = os.getenv("DEBUG", None) is not None
 
@@ -44,7 +41,7 @@ class HelpFormatter(argparse.RawDescriptionHelpFormatter, argparse.ArgumentDefau
 
 def slurm_launcher(cmd, sbatch_args):
     """
-    Create a temp file with the slurm sbatch syntax, launch it and then delete it
+    Create a temp file with the slurm sbatch syntax, launch it and then delete it.
     """
     if DEBUG:
         print("\n#### OUTPUT SCRIPT ####")
@@ -61,24 +58,64 @@ def slurm_launcher(cmd, sbatch_args):
         sub.call(["sbatch"] + sbatch_args + [f"{f.name}"], shell=False)
 
 
-def make_slurm_script(conf, cmd):
+def make_slurm_script(conf, cmd, argfile, num_runs):
     """
-    Generate the information to be passed to SLURM about the job
-    Also take care of setting up the environment
-    The python command will be added afterwards
+    Generate the information to be passed to SLURM about the job.
+    Also take care of setting up the environment.
+    The python command will be added afterwards.
     """
+    if argfile:
+        # Count the number of arg lines in the arg file.
+        with argfile.open() as f:
+            num_runs = 0
+            has_blank = False
+            for i, line in enumerate(f):
+                if line.strip():
+                    # This is a non-blank line.
+                    num_runs += 1
+                    # If a non-blank follows any blank line...
+                    if has_blank:
+                        raise RuntimeError("Argfile cannot have blank lines, except at the end of the file. Found"
+                                           f" blank at line {i-1}.")
+                else:
+                    has_blank = True
+    if num_runs < 1:
+        raise ValueError(f"num_runs should be a positive number, but is {num_runs} instead.")
+
     # The shebang is not needed by slurm, but can be useful if we want to try running the script
     # ourselves.
-    shebang = "#!/bin/bash"
-    flags = "\n".join(
-        f"#SBATCH --{flag}={value}" for flag, value in conf["resources"].items()
-    )
-    script = f"{shebang}\n{flags}\n\n"
+    script = "#!/bin/bash\n"
+
+    # sbatch flags
+    for flag, value in conf["resources"].items():
+        script += f"#SBATCH --{flag}={value}\n"
+    if num_runs > 1:
+        # If we have multiple jobs, launch them as an array.
+        script += f"#SBATCH --array=1-{num_runs}\n"
+
+    # Shell commands
+    script += "\n"
+    script += "set -e\n"  # exit if any command fails
+    script += "set -o pipefail\n"  # cause errors within a series of piped commands to bubble to the surface
     script += "source ~/.bash_profile\n"  # build the user's environment just as if we spawned a new login shell
     script += "cd ${SLURM_SUBMIT_DIR}\n"  # run in the same directory as the python script, so relative paths work
-    script += f"echo 'Command: {cmd}'\n"  # print the command we're about to run
-    script += f"{conf['env']} && {cmd}"  # activate conda env and launch script if successful
+    script += f'CMD="{cmd}"\n'
+    if argfile:
+        # Takes the Nth line from the argfile as additional args for the command.
+        script += f'ARGLIST="$(head -$SLURM_ARRAY_TASK_ID {argfile} | tail -1)"\n'
+        script += 'CMD="$CMD $ARGLIST"\n'
+    script += 'echo "Command: $CMD"\n'  # print the command we're about to run
+    script += conf["env"] + "\n"  # activate conda env
+    script += f'eval "$CMD"\n'  # finally, launch program
     return script
+
+
+def check_path(path):
+    pathobj = Path(path)
+    if pathobj.exists():
+        return pathobj.resolve()
+    else:
+        raise argparse.ArgumentTypeError(f"{path} is not a valid path.")
 
 
 if __name__ == "__main__":
@@ -97,12 +134,20 @@ if __name__ == "__main__":
     parser.add_argument(
         "--runs",
         type=int,
-        help="How many repetitions to run.",
         default=1,
+        help="How many repetitions to run. This will result in an array of jobs, rather than a single job.",
+    )
+    parser.add_argument(
+        "--argfile",
+        type=check_path,
+        help="A file containing a list of argument strings, one per job. This will result in an array of jobs, where"
+             " each job corresponds to a single line of this file. The args in the file are tacked onto the end of the"
+             " command given. If this argument is present, --runs will be ignored.",
     )
     parser.add_argument(
         "-d",
         "--rundir",
+        type=Path,
         help="The directory from which to launch the script. Slurm output will be directed here.",
     )
     parser.add_argument(
@@ -121,16 +166,6 @@ if __name__ == "__main__":
     config_file = Path(__file__).parent / "config.json"
     print(args)
 
-    if args.rundir:
-        rundir = Path(args.rundir)
-        if not DEBUG:
-            rundir.mkdir(exist_ok=True, parents=True)
-        if not args.force and list(rundir.glob("slurm-*.out")):
-            parser.error(f"A Slurm output file already exists in the target directory: {rundir.resolve()}.\nUse"
-                         " -f/--force to run in this folder anyway.")
-    else:
-        rundir = Path(".")
-
     entry_path = Path(args.entry).resolve()
     assert entry_path.exists(), f"File {entry_path} not found."
     assert entry_path.is_file(), f"File {entry_path} is not a file."
@@ -144,10 +179,32 @@ if __name__ == "__main__":
 
     config = available_configs[args.resource]
     device = config["device"]
-    assert device in [
-        "cpu",
-        "gpu",
-    ], f"Wrong device requested: {device} not in [cpu, gpu]"
+    devlist = ["cpu", "gpu"]
+    assert device in devlist, f"Wrong device requested: {device} not in {devlist}."
+
+    # Set up destination directory.
+    if args.rundir:
+        rundir = Path(args.rundir).resolve()
+        if not DEBUG:
+            rundir.mkdir(exist_ok=True, parents=True)
+        if not args.force and list(rundir.glob("slurm-*.out")):
+            parser.error(f"A Slurm output file already exists in the target directory: {rundir.resolve()}.\nUse"
+                         " -f/--force to run in this folder anyway.")
+    else:
+        rundir = Path(".").resolve()
+
+    # Copy argfile to destination if not already there (do this last so we don't copy it needlessly when the above
+    # chacks fail).
+    if args.argfile and args.argfile.parent != rundir:
+        destfile = rundir / args.argfile.name
+        if not args.force and destfile.exists():
+            parser.error(f"Argfile already exists in the target directory: {destfile}.\nUse -f/--force to overwrite.")
+        if not DEBUG:
+            shutil.copy(args.argfile, rundir)
+            args.argfile = destfile
+        else:
+            print(f"Would copy {args.argfile} into {rundir}.")
+
     ##################################################
 
     if not DEBUG:
@@ -158,7 +215,5 @@ if __name__ == "__main__":
     print("Config:\n", json.dumps(config, indent=2, sort_keys=True))
 
     cmd = f"time python {entry_path} {' '.join(args.flags)}"
-    scripts = [make_slurm_script(config, cmd) for _ in range(args.runs)]
-
-    for i, script in enumerate(scripts):
-        slurm_launcher(script, sbatch_args)
+    script = make_slurm_script(config, cmd, args.argfile, args.runs)
+    slurm_launcher(script, sbatch_args)

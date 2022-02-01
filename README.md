@@ -144,7 +144,7 @@ The `config.json` file provides a list of pre-defined resource configurations wh
 SLURM jobs. This is helpful to save sets of `sbatch` or `srun` options that the user uses frequently.
 
 Each entry has the following structure:
-```json
+```
 {
   NAME:
     DEVICE 

@@ -1,15 +1,21 @@
 #!/bin/bash
+set -e  # exit on any error
+set -o pipefail  # allow errors in piped commands to bubble up
+
 if [[ $# -ne 1 ]]; then
-        # echo "Usage: interact partition gres"
-        # echo -e "\t partition : parition name, used in --parttion=" 
-        # echo -e "\t gres : gpu resources to request, e.g. --gres=gpu:1" 
-        echo "Usage: interact configuration"
-else 
-	# PARTITION=$1
-	# GRES=$2
-	# srun --partition=$1 --gres=$2 --accel-bind=g --pty bash
+  # echo "Usage: interact partition gres"
+  # echo -e "\t partition : parition name, used in --parttion="
+  # echo -e "\t gres : gpu resources to request, e.g. --gres=gpu:1"
+  echo "Usage: interact <configuration>"
+else
+  # PARTITION=$1
+  # GRES=$2
+  # srun --partition=$1 --gres=$2 --accel-bind=g --pty bash
   echo "Using configuration: $1"
+  # Temporarily run in this script's directory so we can use a relative reference to interact.py.
+  pushd "$(dirname "$(realpath "$0")")" > /dev/null
   CMD=$(python interact.py "$1")
+  popd > /dev/null
   echo "Running: $CMD"
-  $CMD
+  eval "$CMD"
 fi

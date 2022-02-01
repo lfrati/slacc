@@ -1,20 +1,16 @@
 #!/usr/bin/env python
 """
 Utility to launch a python script on SLURM, using CPU or GPU. Uses configuration
-information from config.json and supports launching multiple repeats.
+information from config.json and supports launching sweeps or repeats.
 
 Flags can be passed to the delegated script by appending them at the end as follows
-    > launcher RESOURCE {--runs} SCRIPT FLAGS
-e.g.
-    > launcher moran-gpu --runs=2 dummy_gpujob.py --epochs=10 --seed 42
+    > launcher <resource> [--runs] <script> [<flags>...]
+For example, this:
+    > launcher moran-gpu --runs 2 dummy_gpujob.py --epochs=10 --seed 42
 is equivalent to twice running this:
     > python dummy_gpujob.py --epochs=10 --seed 42
 
 Furthermore, any settings accepted by `sbatch` may be supplied on the command line.
-These will override the options provided by config.json, if given. For example, to
-add more memory to an existing config:
-    > launcher dggpu --mem=64G dummy_gpujob.py --epochs=10 --seed 42
-
 IMPORTANT: The sbatch options must be supplied in "--name=value" fashion, with an
 equals sign; "--name value" will NOT parse correctly. For any other options
 (including script flags) you may use either format.
@@ -26,6 +22,7 @@ import tempfile
 import json
 import os
 import subprocess as sub
+import sys
 from pathlib import Path
 
 DEBUG = os.getenv("DEBUG", None) is not None
@@ -50,12 +47,12 @@ def slurm_launcher(cmd, sbatch_args):
         sbatch_cmd = ["sbatch"] + sbatch_args + ["<file>"]
         print(" ".join(sbatch_cmd))
         print()
-        return
+        return 0
 
     with tempfile.NamedTemporaryFile() as f:
         f.write(cmd.encode("utf-8"))
         f.flush()
-        sub.call(["sbatch"] + sbatch_args + [f"{f.name}"], shell=False)
+        return sub.call(["sbatch"] + sbatch_args + [f"{f.name}"], shell=False)
 
 
 def make_slurm_script(conf, cmd, argfile, num_runs):
@@ -110,15 +107,68 @@ def make_slurm_script(conf, cmd, argfile, num_runs):
     return script
 
 
+def validate_and_setup(parser, args):
+    """
+    Validate command line arguments, and setup files for input/output.
+    """
+    # Find config file in the same folder as this launcher script.
+    config_file = Path(__file__).parent / "config.json"
+    assert config_file.exists(), f"Configuration file ({config_file}) not found."
+    assert config_file.is_file(), f"Configuration file ({config_file}) is not a file."
+    print(args)
+
+    with open(config_file, "r") as f:
+        available_configs = json.loads(f.read())
+    if args.resource not in available_configs.keys():
+        parser.error(f"Requested resource ({args.resource}) not found in config file ({config_file}).")
+    config = available_configs[args.resource]
+    device = config["device"]
+    devlist = ["cpu", "gpu"]
+    assert device in devlist, f"Wrong device requested: {device} not in {devlist}."
+
+    # Set up destination directory.
+    if args.rundir:
+        args.rundir = Path(args.rundir).resolve()
+        if not DEBUG:
+            args.rundir.mkdir(exist_ok=True, parents=True)
+        if not args.force and list(args.rundir.glob("slurm-*.out")):
+            parser.error(f"A Slurm output file already exists in the target directory: {args.rundir.resolve()}.\nUse"
+                         " -f/--force to run in this folder anyway.")
+    else:
+        args.rundir = Path(".").resolve()
+
+    # Copy argfile to destination if not already there (do this last so we don't copy it needlessly when the above
+    # chacks fail).
+    if args.argfile and args.argfile.parent != args.rundir:
+        destfile = args.rundir / args.argfile.name
+        if not args.force and destfile.exists():
+            parser.error(f"Argfile already exists in the target directory: {destfile}.\nUse -f/--force to overwrite.")
+        if not DEBUG:
+            shutil.copy(args.argfile, args.rundir)
+            args.argfile = destfile
+        else:
+            print(f"Would copy {args.argfile} into {args.rundir}.")
+
+    return config
+
+
 def check_path(path):
     pathobj = Path(path)
     if pathobj.exists():
         return pathobj.resolve()
     else:
-        raise argparse.ArgumentTypeError(f"{path} is not a valid path.")
+        raise argparse.ArgumentTypeError(f"Not a valid path: {path}")
 
 
-if __name__ == "__main__":
+def check_file(path):
+    pathobj = check_path(path)
+    if pathobj.is_file():
+        return pathobj
+    else:
+        raise argparse.ArgumentTypeError(f"Exists, but not a file: {path}")
+
+
+def main(args=None):
 
     if DEBUG:
         print(
@@ -132,6 +182,7 @@ if __name__ == "__main__":
         help="Identifier of the resource configuration to use. Must be one of the configs present in config.json.",
     )
     parser.add_argument(
+        "-r",
         "--runs",
         type=int,
         default=1,
@@ -157,63 +208,23 @@ if __name__ == "__main__":
         help="Launch a new job even if another job has already used this output directory. Does not remove the"
         " previous output log, and only needed when specifying --rundir.",
     )
-    parser.add_argument("entry", help="The python script to launch.")
+    parser.add_argument("script", type=check_file, help="The python script to launch.")
     parser.add_argument("flags", nargs=argparse.REMAINDER, help="Flags to be passed to the python script.")
-    args, sbatch_args = parser.parse_known_args()
+    args, sbatch_args = parser.parse_known_args(args)
 
-    ################# VALIDATE INPUT #################
-    # Find config file in the same folder as this launcher script.
-    config_file = Path(__file__).parent / "config.json"
-    print(args)
-
-    entry_path = Path(args.entry).resolve()
-    assert entry_path.exists(), f"File {entry_path} not found."
-    assert entry_path.is_file(), f"File {entry_path} is not a file."
-    assert config_file.exists(), f"Configuration file ({config_file}) not found."
-    assert config_file.is_file(), f"Configuration file ({config_file}) is not a file."
-    with open(config_file, "r") as f:
-        available_configs = json.loads(f.read())
-    assert (
-        args.resource in available_configs.keys()
-    ), f"Requested configuration ({args.resource}) not found in config file ({config_file})"
-
-    config = available_configs[args.resource]
-    device = config["device"]
-    devlist = ["cpu", "gpu"]
-    assert device in devlist, f"Wrong device requested: {device} not in {devlist}."
-
-    # Set up destination directory.
-    if args.rundir:
-        rundir = Path(args.rundir).resolve()
-        if not DEBUG:
-            rundir.mkdir(exist_ok=True, parents=True)
-        if not args.force and list(rundir.glob("slurm-*.out")):
-            parser.error(f"A Slurm output file already exists in the target directory: {rundir.resolve()}.\nUse"
-                         " -f/--force to run in this folder anyway.")
-    else:
-        rundir = Path(".").resolve()
-
-    # Copy argfile to destination if not already there (do this last so we don't copy it needlessly when the above
-    # chacks fail).
-    if args.argfile and args.argfile.parent != rundir:
-        destfile = rundir / args.argfile.name
-        if not args.force and destfile.exists():
-            parser.error(f"Argfile already exists in the target directory: {destfile}.\nUse -f/--force to overwrite.")
-        if not DEBUG:
-            shutil.copy(args.argfile, rundir)
-            args.argfile = destfile
-        else:
-            print(f"Would copy {args.argfile} into {rundir}.")
-
-    ##################################################
+    config = validate_and_setup(parser, args)
 
     if not DEBUG:
-        os.chdir(rundir)
-    print("Running from:", rundir.resolve())
-    print("File:", entry_path)
+        os.chdir(args.rundir)
+    print("Running from:", args.rundir.resolve())
+    print("Python script:", args.script)
     print("Flags:", args.flags)
     print("Config:\n", json.dumps(config, indent=2, sort_keys=True))
 
-    cmd = f"time python {entry_path} {' '.join(args.flags)}"
+    cmd = f"time python {args.script} {' '.join(args.flags)}"
     script = make_slurm_script(config, cmd, args.argfile, args.runs)
-    slurm_launcher(script, sbatch_args)
+    return slurm_launcher(script, sbatch_args)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

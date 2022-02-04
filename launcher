@@ -92,9 +92,9 @@ def make_slurm_script(conf, cmd, argfile, num_runs):
 
     # Shell commands
     script += "\n"
-    script += "set -e\n"  # exit if any command fails
-    script += "set -o pipefail\n"  # cause errors within a series of piped commands to bubble to the surface
     script += "source ~/.bash_profile\n"  # build the user's environment just as if we spawned a new login shell
+    script += "set -e\n"  # exit if any command fails (IMPORTANT: only set this after shell setup)
+    script += "set -o pipefail\n"  # cause errors within a series of piped commands to bubble to the surface
     script += "cd ${SLURM_SUBMIT_DIR}\n"  # run in the same directory as the python script, so relative paths work
     script += f'CMD="{cmd}"\n'
     if argfile:

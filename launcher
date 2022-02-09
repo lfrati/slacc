@@ -131,11 +131,12 @@ def validate_and_setup(parser, args):
         args.rundir = Path(args.rundir).resolve()
         if not DEBUG:
             args.rundir.mkdir(exist_ok=True, parents=True)
-        if not args.force and list(args.rundir.glob("slurm-*.out")):
-            parser.error(f"A Slurm output file already exists in the target directory: {args.rundir.resolve()}.\nUse"
-                         " -f/--force to run in this folder anyway.")
     else:
         args.rundir = Path(".").resolve()
+
+    if not args.force and list(args.rundir.glob("slurm-*.out")):
+        parser.error(f"A Slurm output file already exists in the target directory: {args.rundir.resolve()}.\n"
+                     "Use -f/--force to run in this folder anyway.")
 
     # Copy argfile to destination if not already there (do this last so we don't copy it needlessly when the above
     # chacks fail).

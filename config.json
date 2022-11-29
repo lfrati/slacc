@@ -58,18 +58,29 @@
       "partition": "bdgpu",
       "gres": "gpu:1",
       "cpus-per-task": 1,
-      "mem": "10G"
+      "mem": "12G"
     }
   },
   "blue": {
-    "env": "conda activate deep",
+    "env": "conda activate neat",
     "device": "cpu",
     "host": "vacc",
     "resources": {
       "time": "1-00:00:00",
       "partition": "bluemoon",
-      "cpus-per-task": 1,
-      "mem": "8000"
+      "cpus-per-task": 32,
+      "mem": "10G"
+    }
+  },
+  "bdneat": {
+    "env": "conda activate neat",
+    "device": "cpu",
+    "host": "vacc",
+    "resources": {
+      "time": "1-00:00:00",
+      "partition": "bdgpu",
+      "cpus-per-task": 32,
+      "mem": "10G"
     }
   }
 }

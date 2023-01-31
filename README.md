@@ -33,11 +33,15 @@ export PATH=$HOME/scratch/neuromanager:$PATH  # ... or wherever your neuromanage
 
 ## [launcher](launcher)
 
-This is a wrapper around `sbatch` to make it way easier to launch python scripts quickly. It allows you to turn:
+This is a wrapper around `sbatch` to make it way easier to launch python scripts quickly. If you would run this locally:
 ```shell
 python train.py --lr=0.01
 ```
-into something like:
+then to run the same thing on the VACC you would do:
+```shell
+launcher dggpu train.py --lr=0.01
+```
+_Voilá!_ Behind the scenes, the launcher created an sbatch script for you like:
 ```bash
 #!/bin/bash
 #SBATCH --time=2-00:00:00

@@ -4,34 +4,46 @@
     "device": "gpu",
     "host": "vacc",
     "resources": {
-      "time": "1-00:00:00",
+      "time": "2-00:00:00",
       "partition": "dggpu",
       "gres": "gpu:1",
       "cpus-per-task": 1,
-      "mem": "16000"
+      "mem": "12G"
     }
   },
   "bdgpu": {
+    "env": "conda activate deep-amd",
+    "device": "gpu",
+    "host": "vacc",
+    "resources": {
+      "time": "2-00:00:00",
+      "partition": "bdgpu",
+      "gres": "gpu:1",
+      "cpus-per-task": 1,
+      "mem": "12G"
+    }
+  },
+  "dg-multi": {
     "env": "conda activate deep",
     "device": "gpu",
     "host": "vacc",
     "resources": {
-      "time": "1-00:00:00",
-      "partition": "bdgpu",
-      "gres": "gpu:1",
-      "cpus-per-task": 1,
-      "mem": "8000"
+      "time": "2-00:00:00",
+      "partition": "dggpu",
+      "gres": "gpu:2",
+      "cpus-per-task": 4,
+      "mem": "12G"
     }
   },
   "blue": {
-    "env": "conda activate deep",
+    "env": "conda activate myenv",
     "device": "cpu",
     "host": "vacc",
     "resources": {
-      "time": "1-00:00:00",
+      "time": "30:00:00",
       "partition": "bluemoon",
-      "cpus-per-task": 1,
-      "mem": "8000"
+      "cpus-per-task": 12,
+      "mem": "10G"
     }
   }
 }

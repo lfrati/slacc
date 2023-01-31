@@ -84,10 +84,3 @@ e.g.
   }
 }
 ```
-The script then launches jobs either directly (if support is local) or through a SLURM sbatch file.
-Why also support a local flag? Because it is useful in combination with the --runs flag.
-Since the script uses subprocesses to launch the scripts and awaits them before moving to the next we can easily chain multiple long jobs on a local machine with a single GPU.
-E.g.
-```
-launcher --runs=10 local-gpu dummytrain.py --steps=10
-```

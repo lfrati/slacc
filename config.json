@@ -92,7 +92,7 @@
     "resources": {
       "time": "30:00:00",
       "partition": "bluemoon",
-      "cpus-per-task": 32,
+      "cpus-per-task": 12,
       "mem": "10G"
     }
   },
@@ -103,7 +103,7 @@
     "resources": {
       "time": "48:00:00",
       "partition": "bdgpu",
-      "cpus-per-task": 32,
+      "cpus-per-task": 20,
       "mem": "10G"
     }
   }

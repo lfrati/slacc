@@ -52,31 +52,17 @@ where support/device information needs to be provided by ```config.json``` with 
 {
   NAME:
     DEVICE 
-    HOST
     ENV
     RESOURCES
 }
 ```
-where NAME is used to select the specs, DEVICE is either "gpu" or "cpu", HOST is either "local" or a remote server name, ENV specifies how to set up virtual environments if needed and RESOURCES specifies the option to pass to SLURM
+where NAME is used to select the specs, DEVICE is either "gpu" or "cpu" ENV specifies how to set up virtual environments if needed and RESOURCES specifies the option to pass to SLURM
 e.g.
 ```json
 {
-  "local-gpu": {
-    "device": "gpu",
-    "host": "local",
-    "env": "conda activate deep",
-    "resources": ""
-  },
-  "local-cpu": {
-    "device": "cpu",
-    "host": "local",
-    "env": "conda activate deep",
-    "resources": ""
-  },
   "remote-gpu": {
     "env": "conda activate deep",
     "device": "gpu",
-    "host": "sersver-name",
     "resources": {
       "time": "2-00:00:00",
       "account": "lfrati",
@@ -86,7 +72,16 @@ e.g.
       "mem": "8000"
     }
   },
-
+  "remote-cpu": {
+    "env": "conda activate deep",
+    "device": "cpu",
+    "resources": {
+      "time": "1-00:00:00",
+      "partition": "bluemoon",
+      "cpus-per-task": 1,
+      "mem": "8000"
+    }
+  }
 }
 ```
 The script then launches jobs either directly (if support is local) or through a SLURM sbatch file.

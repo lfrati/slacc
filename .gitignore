@@ -5,3 +5,4 @@ counter.txt
 
 # PyCharm / IntelliJ IDEA settings
 .idea/
+src/slacc.egg-info/*

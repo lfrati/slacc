@@ -1,4 +1,4 @@
-# NEURO(botics) simple job MANAGER
+# SLurm on vACC
 
 Isn't it fun to have a nice GPU in your computer and to experiment left and right? You just write some python scripts
 and then launch them on your machine, wait, repeat. Life is simple and beautiful.
@@ -11,7 +11,7 @@ Wouldn't it be nice to just abstract that pain away and remain in python land?
 
 ## Prerequisites
 
-- Python >=3.5 
+- Python >=3.9
 - PyTorch >=1.6.0
 - psutil
 - pynvml

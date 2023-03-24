@@ -1,0 +1,43 @@
+[build-system]
+requires      = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "slacc"
+version = "0.0.1"
+description = "Easily control SLURM from python on the VACC."
+readme = "README.md"
+authors = [{ name = "lfrati", email = "lfrati.github@gmail.com" }]
+license = {text = "MIT"}
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+]
+keywords = ["slurm", "hpc"]
+dependencies = []
+requires-python = ">=3.9"
+
+    [project.scripts]
+        slaunch = "slacc.__main__:launch"
+        sinteract = "slacc.__main__:interact"
+
+    [project.optional-dependencies]
+    dev = ["bumpver", "pip-tools", "build", "twine", "pytest"]
+
+    [project.urls]
+    Homepage = "https://github.com/lfrati/slacc"
+
+[tool.bumpver]
+current_version = "0.0.1"
+version_pattern = "MAJOR.MINOR.PATCH"
+commit_message  = "Bump version {old_version} -> {new_version}"
+commit = true
+tag = true
+push = true
+
+[tool.bumpver.file_patterns]
+"pyproject.toml" = [
+    'current_version = "{version}"',
+    'version = "{version}"'
+]
+"src/slacc/__init__.py" = ["{version}"]

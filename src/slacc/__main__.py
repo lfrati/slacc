@@ -1,4 +1,49 @@
-#!/usr/bin/env python
+import argparse
+import json
+import os
+import shutil
+import subprocess as sub
+import sys
+import tempfile
+from pathlib import Path
+
+import importlib.resources as pkg_resources
+
+DEBUG = os.getenv("DEBUG", None) is not None
+
+########################### cli command: sinteract resource ###########################
+
+def make_flags(conf):
+    flags = " ".join(f"--{flag}={value}" for flag, value in conf["resources"].items())
+    return flags
+
+def read_conf(resource):
+    available_configs = json.loads(pkg_resources.read_text(__package__,"config.json"))
+    assert (
+        resource in available_configs.keys()
+    ), f"Requested configuration ({resource}) not found in config file ({config_file})"
+
+    config = available_configs[resource]
+    return config
+
+
+def interact():
+    parser = argparse.ArgumentParser(prog="interact")
+    parser.add_argument("resource")
+    args = parser.parse_args()
+
+    # print("Config:\n", json.dumps(config, indent=2, sort_keys=True))
+    config = read_conf(args.resource)
+    flags = make_flags(config)
+    cmd = f"srun {flags} --accel-bind=g --pty bash"
+
+    print(cmd)
+    if not DEBUG:
+      sub.call(cmd.split(" "), shell=False)
+
+
+########################### cli command: slaunch opts ###########################
+
 """
 Utility to launch a python script on SLURM, using CPU or GPU. Uses configuration
 information from config.json and supports launching sweeps or repeats.
@@ -15,18 +60,6 @@ IMPORTANT: The sbatch options must be supplied in "--name=value" fashion, with a
 equals sign; "--name value" will NOT parse correctly. For any other options
 (including script flags) you may use either format.
 """
-
-import argparse
-import json
-import os
-import shutil
-import subprocess as sub
-import sys
-import tempfile
-from pathlib import Path
-
-DEBUG = os.getenv("DEBUG", None) is not None
-
 
 class HelpFormatter(argparse.RawDescriptionHelpFormatter, argparse.ArgumentDefaultsHelpFormatter):
     """
@@ -122,9 +155,6 @@ def validate_and_setup(parser, args):
     if args.resource not in available_configs.keys():
         parser.error(f"Requested resource ({args.resource}) not found in config file ({config_file}).")
     config = available_configs[args.resource]
-    device = config["device"]
-    devlist = ["cpu", "gpu"]
-    assert device in devlist, f"Wrong device requested: {device} not in {devlist}."
 
     # Set up destination directory.
     if args.rundir:
@@ -139,7 +169,7 @@ def validate_and_setup(parser, args):
                      "Use -f/--force to run in this folder anyway.")
 
     # Copy argfile to destination if not already there (do this last so we don't copy it needlessly when the above
-    # chacks fail).
+    # checks fail).
     if args.argfile and args.argfile.parent != args.rundir:
         destfile = args.rundir / args.argfile.name
         if not args.force and destfile.exists():
@@ -169,7 +199,7 @@ def check_file(path):
         raise argparse.ArgumentTypeError(f"Exists, but not a file: {path}")
 
 
-def main(args=None):
+def launch(args=None):
 
     if DEBUG:
         print(
@@ -227,5 +257,3 @@ def main(args=None):
     return slurm_launcher(script, sbatch_args)
 
 
-if __name__ == "__main__":
-    sys.exit(main())

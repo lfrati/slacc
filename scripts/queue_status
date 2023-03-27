@@ -1,8 +1,0 @@
-squeue | # get slurm usage info
- awk 'NR>1 {print $2, $4}' - | # remove header and keep partition/user
- sort |
- uniq -c | # count entries per partition/user
- sort -k2,2 | # sort by partitions
- sort -k1,1 -n -r |  # sort numerically by counts
- awk 'BEGIN{print "NJOBS PARTITION USER"};{$1 = sprintf("%-5s", $1)}{$2 = sprintf("%-9s", $2)}{ print $1, $2, $3 }'
- # print with header and formatting using sprinf cheat

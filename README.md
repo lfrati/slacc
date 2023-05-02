@@ -1,4 +1,4 @@
-# SLurm on vACC
+# SLurm on vACC (slacc)
 
 Isn't it fun to have a nice GPU in your computer and to experiment left and right? You just write some python scripts
 and then launch them on your machine, wait, repeat. Life is simple and beautiful.
@@ -13,22 +13,17 @@ Wouldn't it be nice to just abstract that pain away and remain in python land?
 
 - Python >=3.9
 
-Additional requirements for `gpu_check.py`:
-- PyTorch >=1.6.0
-- psutil
-- pynvml
+That's it.
 
-To set up a compatible conda environment:
-```shell
-$  conda create -n <env-name> -c conda-forge -c pytorch python=3.9 psutil pynvml pytorch cudatoolkit=10.2
-```
-You may want to check [here](https://pytorch.org/get-started/locally/) to confirm the pytorch installation procedure is
-correct for your GPU and NVIDIA driver.
+# How does it work?
 
+This package provides 2 commands you can use in your CLI: `slaunch` and `sinteract`
 
-## slaunch
+## 1. Slurm LAUNCH (slaunch)
 
-This is a wrapper around `sbatch` to make it way easier to launch python scripts quickly. If you would run this locally:
+This is a wrapper around SLURM's [sbatch](https://slurm.schedmd.com/sbatch.html) to make it way easier to launch python scripts asynchronously.
+
+Let's say that you wanted to run this locally:
 ```shell
 python train.py --lr=0.01
 ```
@@ -45,14 +40,14 @@ _Voilá!_ Behind the scenes, the launcher created an sbatch script for you like:
 #SBATCH --gres=gpu:p100:1
 #SBATCH --mem=8000
 
-conda activate deep
+conda activate dgenv
 python train.py --lr=0.01
 ```
 Even better, it makes it easy to launch parameter sweeps as a job array.
 
 ### Basic Usage
 
-> :page_facing_up: Before using, you will want to edit the resource configs to suit your needs, as described in the
+> :warning: Before using, you will want to edit the resource configs to suit your needs, as described in the
 > [Resource Configurations](#resource-configurations) section.
 
 It has the following syntax:
@@ -84,7 +79,7 @@ equals sign; `--name value` will *not* parse correctly. For any other options
 A recommended way to run jobs is to isolate different experiments to separate folders, so that all the related inputs
 and outputs can be stored in one place. This can be done with the `-d/--rundir` option:
 ```shell
-launcher dggpu -d experiments/my-next-breakthrough train.py --config train-config.yml
+slaunch dggpu -d experiments/my-next-breakthrough train.py --config train-config.yml
 ```
 In this example, all experiments are stored in the corresponding repository, under the `experiments/` folder. The script
 runs in this folder, where it expects to find a `train-config.yml` file. Say the script also generates a
@@ -115,7 +110,7 @@ slaunch bdgpu --runs 10 eval.py --lr 0.01 --num-steps 10 --plots
 Or you can run a sweep over different configurations, by providing each configuration as a separate line in an
 "argfile":
 ```shell
-launcher bdgpu --argfile sweep-args.txt eval.py --plots
+slaunch bdgpu --argfile sweep-args.txt eval.py --plots
 ```
 Where the argfile looks something like this:
 ```
@@ -130,9 +125,9 @@ Where the argfile looks something like this:
 In both cases, these will be launched as a [job array](https://slurm.schedmd.com/job_array.html), making it easier to
 track and manage the jobs as a single unit.
 
-## sinteract
+## 2. Slurm INTERACTive (sinteract)
 
-This is a wrapper around `srun`. It allows you to easily start an interactive shell on one of the SLURM nodes.  The
+This is a wrapper around `srun` that allows you to easily start an interactive shell on one of the SLURM nodes.  The
 shell you launch will be granted the resources of the [resource config](#resource-configurations) you provide.
 
 Example:
@@ -163,8 +158,8 @@ Each entry has the following structure:
 Here is a concrete example:
 ```json
 {
-  "remote-gpu": {
-    "env": "conda activate deep",
+  "dggpu": {
+    "env": "conda activate dgenv",
     "resources": {
       "time": "2-00:00:00",
       "partition": "big-gpu",
@@ -173,8 +168,8 @@ Here is a concrete example:
       "mem": "8000"
     }
   },
-  "remote-cpu": {
-    "env": "conda activate deep",
+  "bigcpu": {
+    "env": "conda activate myenv",
     "device": "cpu",
     "resources": {
       "time": "1-00:00:00",
@@ -185,5 +180,12 @@ Here is a concrete example:
   }
 }
 ```
+A few default configurations are provided as part of the package [config.json](src/slacc/config.json).
 
-More examples can be found in the [config.json](config.json).
+:warning: To customize the resources and environment names the launcher scripts look at (increasing priority):
+1. (LOW PRIO) [Defaults](src/slacc/config.json) provided by slacc 
+2. (MED PRIO) $HOME/.config/slacc/config.json (User)
+3. (MAX PRIO) Directory containing the job script. (e.g. when launching ~/scratch/agi_net/train.py looks for ~/scratch/agi_net/config.json)
+
+So use $HOME/.config/slacc/config.json for user wide settings and the job's folders for fine grained settings.
+

@@ -19,6 +19,7 @@ requires-python = ">=3.9"
 
     [project.scripts]
         slaunch = "slacc.__main__:launch"
+        sconfig = "slacc.__main__:write_conf"
         sinteract = "slacc.__main__:interact"
 
     [project.optional-dependencies]

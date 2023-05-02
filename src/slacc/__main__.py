@@ -10,6 +10,17 @@ import tempfile
 DEBUG = os.getenv("DEBUG", None) is not None
 
 
+def write_conf():
+    available_configs = json.loads(pkg_resources.read_text(__package__, "config.json"))
+    user_config_file = Path.home() / ".config" / "slacc" / "config.json"
+    if not user_config_file.exists():
+        with open(user_config_file, "w") as f:
+            f.write(json.dumps(available_configs, indent=2))
+        print(f"Copied default config.json to {user_config_file}")
+    else:
+        print(f"{user_config_file} exists already. Abort.")
+
+
 def read_conf(args, parser):
     """
     Retrieve the requested configuration from the available json configs.
@@ -39,7 +50,11 @@ def read_conf(args, parser):
         print(f"No user defined configs found in: {user_config_file}.")
 
     # then for any custom ones in the same folder as the script being launched
-    custom_config_file = args.script.parent / "config.json"
+    try:
+        custom_config_file = args.script.parent / "config.json"
+    except AttributeError:
+        # or the current folder if using sinteract (doesn't specify a script)
+        custom_config_file = Path.cwd() / "config.json"
 
     if custom_config_file.exists():
         assert (
@@ -96,9 +111,9 @@ Utility to launch a python script on SLURM, using CPU or GPU. Uses configuration
 information from config.json and supports launching sweeps or repeats.
 
 Flags can be passed to the delegated script by appending them at the end as follows
-    > launcher <resource> [--runs] <script> [<flags>...]
+    > slaunch <resource> [--runs] <script> [<flags>...]
 For example, this:
-    > launcher moran-gpu --runs 2 dummy_gpujob.py --epochs=10 --seed 42
+    > slaunch moran-gpu --runs 2 dummy_gpujob.py --epochs=10 --seed 42
 is equivalent to twice running this:
     > python dummy_gpujob.py --epochs=10 --seed 42
 
@@ -251,7 +266,7 @@ def check_file(path):
         raise argparse.ArgumentTypeError(f"Exists, but not a file: {path}")
 
 
-def launch(args=None):
+def launch():
     if DEBUG:
         print(
             "#####################\n" + "##### DEBUG MODE ####\n"
@@ -296,7 +311,7 @@ def launch(args=None):
         nargs=argparse.REMAINDER,
         help="Flags to be passed to the python script.",
     )
-    args, sbatch_args = parser.parse_known_args(args)
+    args, sbatch_args = parser.parse_known_args()
 
     config = validate_and_setup(parser, args)
 

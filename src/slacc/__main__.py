@@ -18,6 +18,26 @@ def read_conf(args, parser):
     # first look for the default ones shipped with the package
     available_configs = json.loads(pkg_resources.read_text(__package__, "config.json"))
 
+    user_config_file = Path.home() / ".config" / "slacc" / "config.json"
+
+    if user_config_file.exists():
+        assert (
+            user_config_file.is_file()
+        ), f"Configuration file ({user_config_file}) is not a file."
+        print(f"Found custom configs: {user_config_file}")
+        try:
+            with open(user_config_file, "r") as f:
+                user_configs = json.loads(f.read())
+        except json.JSONDecodeError:
+            parser.error(f"Could not parse custom config: {user_config_file}")
+        else:
+            print(
+                f"Added user configs {list(user_configs.keys())} to available configs."
+            )
+            available_configs.update(user_configs)
+    else:
+        print(f"No user defined configs found in: {user_config_file}.")
+
     # then for any custom ones in the same folder as the script being launched
     custom_config_file = args.script.parent / "config.json"
 
@@ -52,15 +72,6 @@ def read_conf(args, parser):
 def make_flags(conf):
     flags = " ".join(f"--{flag}={value}" for flag, value in conf["resources"].items())
     return flags
-
-
-# def read_conf(args):
-#     available_configs = json.loads(pkg_resources.read_text(__package__, "config.json"))
-#     assert (
-#         args.resource in available_configs.keys()
-#     ), f"Requested configuration ({args.resource}) not found in config file"
-#     config = available_configs[args.resource]
-#     return config
 
 
 def interact():

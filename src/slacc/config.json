@@ -1,6 +1,6 @@
 {
   "dggpu": {
-    "env": "conda activate deep",
+    "env": "conda activate dgenv",
     "resources": {
       "time": "2-00:00:00",
       "partition": "dggpu",
@@ -10,7 +10,7 @@
     }
   },
   "bdgpu": {
-    "env": "conda activate deep-amd",
+    "env": "conda activate bdenv",
     "resources": {
       "time": "2-00:00:00",
       "partition": "bdgpu",
@@ -20,7 +20,7 @@
     }
   },
   "dg-multi": {
-    "env": "conda activate deep",
+    "env": "conda activate dgmultienv",
     "resources": {
       "time": "2-00:00:00",
       "partition": "dggpu",
@@ -30,7 +30,7 @@
     }
   },
   "blue": {
-    "env": "conda activate myenv",
+    "env": "conda activate blueenv",
     "resources": {
       "time": "30:00:00",
       "partition": "bluemoon",

@@ -23,7 +23,7 @@ requires-python = ">=3.9"
 
     [project.optional-dependencies]
     gpu = ["psutil", "pynvml"]
-    dev = ["bumpver", "pip-tools", "build", "twine", "pytest"]
+    dev = ["bumpver", "pip-tools", "build", "twine"]
 
     [project.urls]
     Homepage = "https://github.com/lfrati/slacc"

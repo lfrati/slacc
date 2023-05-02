@@ -182,10 +182,10 @@ Here is a concrete example:
 ```
 A few default configurations are provided as part of the package [config.json](src/slacc/config.json).
 
-:warning: To customize the resources and environment names the launcher scripts look at (increasing priority):
-1. (LOW PRIO) [Defaults](src/slacc/config.json) provided by slacc 
-2. (MED PRIO) $HOME/.config/slacc/config.json (User)
-3. (MAX PRIO) Directory containing the job script. (e.g. when launching ~/scratch/agi_net/train.py looks for ~/scratch/agi_net/config.json)
+:warning: There are 3 places where slacc looks for configuration files. If the same resource is defined in multiple places, only the one with highest priority is considered:
+1. (LOW PRIO) [Defaults](src/slacc/config.json) provided by slacc (use this if you are happy with the defaults and don't want to change anything)
+2. (MED PRIO) $HOME/.config/slacc/config.json (use this if you want to create custom configurations that you are planning to re-use)
+3. (MAX PRIO) Directory containing the job script, e.g. when launching ~/scratch/agi_net/train.py looks for ~/scratch/agi_net/config.json (use this if you want each individual run to use a different configuration)
 
 So use $HOME/.config/slacc/config.json for user wide settings and the job's folders for fine grained settings.
 

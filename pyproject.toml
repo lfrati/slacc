@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "slacc"
-version = "0.2.0"
+version = "0.3.0"
 description = "Easily control SLURM from python on the VACC."
 readme = "README.md"
 authors = [{ name = "lfrati", email = "lfrati.github@gmail.com" }]
@@ -28,7 +28,7 @@ requires-python = ">=3.9"
     Homepage = "https://github.com/lfrati/slacc"
 
 [tool.bumpver]
-current_version = "0.2.0"
+current_version = "0.3.0"
 version_pattern = "MAJOR.MINOR.PATCH"
 commit_message  = "Bump version {old_version} -> {new_version}"
 commit = true

@@ -22,7 +22,6 @@ requires-python = ">=3.9"
         sinteract = "slacc.__main__:interact"
 
     [project.optional-dependencies]
-    gpu = ["psutil", "pynvml"]
     dev = ["bumpver", "pip-tools", "build", "twine"]
 
     [project.urls]

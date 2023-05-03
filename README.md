@@ -1,4 +1,9 @@
+<p align="center">
+    <img width="250" alt="Logo" src="https://user-images.githubusercontent.com/3115640/235985755-b6473e9f-e997-46a4-ac5b-b1333ab35470.png">
+</p>
+
 # SLurm on vACC (slacc)
+> "Take it easy and let the VACC work for you." - the wise grad
 
 Isn't it fun to have a nice GPU in your computer and to experiment left and right? You just write some python scripts
 and then launch them on your machine, wait, repeat. Life is simple and beautiful.
@@ -15,9 +20,38 @@ Wouldn't it be nice to just abstract that pain away and remain in python land?
 
 That's it.
 
+## Installation
+### Step 1. Get the thing.
+```bash
+pip install slacc
+```
+>Note: as of May 2023 the `spack` software on the VACC doesn't like python 3.10, so it is suggested to install `slacc` in a 3.9 environment
+>If you are using `conda` (recommended) you can use grab an installer for 3.9 from the [miniconda](https://docs.conda.io/en/latest/miniconda.html) page
+>
+><img src="https://user-images.githubusercontent.com/3115640/235952021-489cc26a-d153-46be-89d4-3e3500ca1ac1.png" width="600"/>
+>
+>This will make your conda `base` environment use python 3.9
+>
+>Alternatively you can create an custom environment with `conda create -n <pick_a_name> python=3.9` and run `pip install slacc` in this new environment.
+
+### Step 2. Customize the thing.
+After installing `slacc` (it should be quick since there are no dependencies) run 
+```bash
+sconfig
+```
+This will copy the default `config.json` file that ships with `slacc`, to `$HOME/.config/slacc/config.json`.
+Feel free to customize it to your needs, or keep it as it is. The most important thing is to make sure that the conda environments declared in config.json
+```
+{ 
+  "dggpu":{ "env": "conda activate dgenv",
+            ...
+}
+```
+match the ones available on your system.
+
 # How does it work?
 
-This package provides 2 commands you can use in your CLI: `slaunch` and `sinteract`
+This package provides 2 main commands you can use in your CLI: `slaunch` and `sinteract` (plus `sconfig` to make a copy default configs)
 
 ## 1. Slurm LAUNCH (slaunch)
 
@@ -187,5 +221,5 @@ A few default configurations are provided as part of the package [config.json](s
 2. (MED PRIO) $HOME/.config/slacc/config.json (use this if you want to create custom configurations that you are planning to re-use)
 3. (MAX PRIO) Directory containing the job script, e.g. when launching ~/scratch/agi_net/train.py looks for ~/scratch/agi_net/config.json (use this if you want each individual run to use a different configuration)
 
-So use $HOME/.config/slacc/config.json for user wide settings and the job's folders for fine grained settings.
+:hammer_and_wrench: Use `sconfig` to copy the default settings to $HOME/.config/slacc/config.json.
 

@@ -169,7 +169,7 @@ Example:
 sinteract bdgpu
 ```
 
-## [Resource Configurations](config.json)
+## Resource Configurations
 
 The `config.json` file provides a list of pre-defined resource configurations which the user can use to launch their
 SLURM jobs. This is helpful to save sets of `sbatch` or `srun` options that the user uses frequently. **You will want
